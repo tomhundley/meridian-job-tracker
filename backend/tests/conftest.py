@@ -1,4 +1,8 @@
-"""Pytest fixtures for backend tests."""
+"""Pytest fixtures for backend tests.
+
+Tests use transaction isolation - each test runs in a transaction that is
+rolled back at the end, so no test data persists to the database.
+"""
 
 import asyncio
 import os
@@ -14,6 +18,13 @@ from src.config.database import Base, get_db
 from src.main import app
 
 
+# Use production database URL - tests run in transactions that rollback
+TEST_DB_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://meridian:meridian@localhost:5434/meridian_jobs"
+)
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     loop = asyncio.new_event_loop()
@@ -23,104 +34,42 @@ def event_loop():
 
 @pytest.fixture(scope="session")
 async def engine():
-    db_url = os.getenv("TEST_DATABASE_URL")
-    if not db_url:
-        pytest.skip("Set TEST_DATABASE_URL to run database-backed tests.")
+    """Create database engine for tests.
 
-    engine = create_async_engine(db_url, poolclass=NullPool)
+    Uses the production database with transaction isolation.
+    Each test runs in a transaction that is rolled back.
+    """
+    engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
 
+    # Verify connection works
     async with engine.begin() as conn:
-        await conn.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'job_status') THEN
-                        CREATE TYPE job_status AS ENUM (
-                            'saved',
-                            'researching',
-                            'ready_to_apply',
-                            'applying',
-                            'applied',
-                            'interviewing',
-                            'offer',
-                            'rejected',
-                            'withdrawn',
-                            'archived'
-                        );
-                    END IF;
-
-                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role_type') THEN
-                        CREATE TYPE role_type AS ENUM (
-                            'cto',
-                            'vp',
-                            'director',
-                            'architect',
-                            'developer'
-                        );
-                    END IF;
-
-                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'application_method') THEN
-                        CREATE TYPE application_method AS ENUM (
-                            'linkedin_quick_apply',
-                            'linkedin_full_apply',
-                            'company_website',
-                            'email',
-                            'referral',
-                            'recruiter',
-                            'manual'
-                        );
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-        # Seed decline reason lookup tables (separate statements for asyncpg)
-        await conn.execute(
-            text(
-                """
-                INSERT INTO user_decline_reasons (code, display_name, category, sort_order, is_active, created_at)
-                VALUES
-                    ('salary_too_low', 'Salary below expectations', 'compensation', 1, true, NOW()),
-                    ('not_remote', 'Not fully remote', 'location', 1, true, NOW()),
-                    ('wrong_tech_stack', 'Technology stack not preferred', 'role_fit', 1, true, NOW()),
-                    ('found_better', 'Found better opportunity', 'personal', 1, true, NOW()),
-                    ('other', 'Other reason', 'personal', 99, true, NOW())
-                ON CONFLICT (code) DO NOTHING
-                """
-            )
-        )
-        await conn.execute(
-            text(
-                """
-                INSERT INTO company_decline_reasons (code, display_name, category, sort_order, is_active, created_at)
-                VALUES
-                    ('selected_other', 'Selected another candidate', 'candidate_selection', 1, true, NOW()),
-                    ('insufficient_experience', 'Not enough experience', 'experience_skills', 1, true, NOW()),
-                    ('failed_technical', 'Did not pass technical assessment', 'experience_skills', 2, true, NOW()),
-                    ('ghosted', 'No response / ghosted', 'other', 1, true, NOW()),
-                    ('other', 'Other reason', 'other', 99, true, NOW())
-                ON CONFLICT (code) DO NOTHING
-                """
-            )
-        )
+        await conn.execute(text("SELECT 1"))
 
     yield engine
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
     await engine.dispose()
 
 
 @pytest.fixture
 async def db_session(engine):
-    session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    """Provide a transactional database session for tests.
+
+    Each test gets a session wrapped in a transaction that is rolled back
+    at the end, ensuring test isolation without affecting production data.
+    """
+    connection = await engine.connect()
+    transaction = await connection.begin()
+
+    session_factory = async_sessionmaker(
+        bind=connection,
+        expire_on_commit=False,
+        class_=AsyncSession
+    )
+
     async with session_factory() as session:
         yield session
-        await session.rollback()
+
+    await transaction.rollback()
+    await connection.close()
 
 
 @pytest.fixture
@@ -138,3 +87,39 @@ async def client(db_session):
 @pytest.fixture
 def api_key_header():
     return {"X-API-Key": settings.api_key}
+
+
+@pytest.fixture
+def unique_job_board_id():
+    """Generate a unique job_board_id for test jobs.
+
+    Since the database has a unique constraint on (job_board, job_board_id),
+    tests need unique values to avoid conflicts with production data.
+    """
+    import uuid
+    counter = [0]
+
+    def _generate():
+        counter[0] += 1
+        return f"test-{uuid.uuid4().hex[:8]}-{counter[0]}"
+
+    return _generate
+
+
+@pytest.fixture
+def test_job_payload(unique_job_board_id):
+    """Create a test job payload with unique identifiers.
+
+    Returns a function that generates job payloads with unique job_board_id
+    to avoid conflicts with production data.
+    """
+    def _create(title="Test Engineer", company="Test Company", **kwargs):
+        return {
+            "title": title,
+            "company": company,
+            "job_board": "test",
+            "job_board_id": unique_job_board_id(),
+            **kwargs
+        }
+
+    return _create

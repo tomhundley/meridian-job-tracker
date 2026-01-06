@@ -9,7 +9,7 @@ from src.models.job import RoleType
 
 
 @pytest.mark.asyncio
-async def test_full_job_flow(monkeypatch, client, api_key_header):
+async def test_full_job_flow(monkeypatch, client, api_key_header, test_job_payload):
     async def fake_generate(*_args, **_kwargs):
         return {
             "content": "Cover letter",
@@ -22,7 +22,7 @@ async def test_full_job_flow(monkeypatch, client, api_key_header):
 
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Acme"},
+        json=test_job_payload(title="Engineer", company="Acme"),
         headers=api_key_header,
     )
     job_id = job_response.json()["id"]

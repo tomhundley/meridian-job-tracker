@@ -40,12 +40,12 @@ async def test_list_company_decline_reasons(client, api_key_header):
 
 
 @pytest.mark.asyncio
-async def test_update_job_with_user_decline_reasons(client, api_key_header):
+async def test_update_job_with_user_decline_reasons(client, api_key_header, test_job_payload):
     """Test updating a job with user decline reasons."""
     # Create a job
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Test Co"},
+        json=test_job_payload(title="Engineer", company="Test Co"),
         headers=api_key_header,
     )
     assert job_response.status_code == 201
@@ -70,12 +70,12 @@ async def test_update_job_with_user_decline_reasons(client, api_key_header):
 
 
 @pytest.mark.asyncio
-async def test_update_job_with_company_decline_reasons(client, api_key_header):
+async def test_update_job_with_company_decline_reasons(client, api_key_header, test_job_payload):
     """Test updating a job with company decline reasons."""
     # Create a job
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Test Co"},
+        json=test_job_payload(title="Engineer", company="Test Co"),
         headers=api_key_header,
     )
     assert job_response.status_code == 201
@@ -100,12 +100,12 @@ async def test_update_job_with_company_decline_reasons(client, api_key_header):
 
 
 @pytest.mark.asyncio
-async def test_clear_decline_reasons(client, api_key_header):
+async def test_clear_decline_reasons(client, api_key_header, test_job_payload):
     """Test clearing decline reasons from a job."""
     # Create a job with decline reasons
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Test Co"},
+        json=test_job_payload(title="Engineer", company="Test Co"),
         headers=api_key_header,
     )
     job_id = job_response.json()["id"]
@@ -137,12 +137,12 @@ async def test_clear_decline_reasons(client, api_key_header):
 
 
 @pytest.mark.asyncio
-async def test_job_response_includes_decline_fields(client, api_key_header):
+async def test_job_response_includes_decline_fields(client, api_key_header, test_job_payload):
     """Test that job GET response includes decline reason fields."""
     # Create a job
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Test Co"},
+        json=test_job_payload(title="Engineer", company="Test Co"),
         headers=api_key_header,
     )
     job_id = job_response.json()["id"]

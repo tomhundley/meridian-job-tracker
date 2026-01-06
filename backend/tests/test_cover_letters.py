@@ -7,7 +7,7 @@ from src.models.job import RoleType
 
 
 @pytest.mark.asyncio
-async def test_generate_cover_letter(monkeypatch, client, api_key_header):
+async def test_generate_cover_letter(monkeypatch, client, api_key_header, test_job_payload):
     async def fake_generate(*_args, **_kwargs):
         return {
             "content": "Dear Hiring Manager, ...",
@@ -20,7 +20,7 @@ async def test_generate_cover_letter(monkeypatch, client, api_key_header):
 
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Acme"},
+        json=test_job_payload(title="Engineer", company="Acme"),
         headers=api_key_header,
     )
     job_id = job_response.json()["id"]
@@ -36,7 +36,7 @@ async def test_generate_cover_letter(monkeypatch, client, api_key_header):
 
 
 @pytest.mark.asyncio
-async def test_approve_cover_letter(monkeypatch, client, api_key_header):
+async def test_approve_cover_letter(monkeypatch, client, api_key_header, test_job_payload):
     async def fake_generate(*_args, **_kwargs):
         return {
             "content": "Cover letter",
@@ -49,7 +49,7 @@ async def test_approve_cover_letter(monkeypatch, client, api_key_header):
 
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Acme"},
+        json=test_job_payload(title="Engineer", company="Acme"),
         headers=api_key_header,
     )
     job_id = job_response.json()["id"]
@@ -71,7 +71,7 @@ async def test_approve_cover_letter(monkeypatch, client, api_key_header):
 
 
 @pytest.mark.asyncio
-async def test_delete_cover_letter(monkeypatch, client, api_key_header):
+async def test_delete_cover_letter(monkeypatch, client, api_key_header, test_job_payload):
     async def fake_generate(*_args, **_kwargs):
         return {
             "content": "Cover letter",
@@ -84,7 +84,7 @@ async def test_delete_cover_letter(monkeypatch, client, api_key_header):
 
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Acme"},
+        json=test_job_payload(title="Engineer", company="Acme"),
         headers=api_key_header,
     )
     job_id = job_response.json()["id"]

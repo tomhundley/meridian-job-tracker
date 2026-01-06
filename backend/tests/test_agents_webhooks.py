@@ -4,10 +4,10 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_create_agent_and_use_permissions(client, api_key_header):
+async def test_create_agent_and_use_permissions(client, api_key_header, test_job_payload):
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Acme"},
+        json=test_job_payload(title="Engineer", company="Acme"),
         headers=api_key_header,
     )
     assert job_response.status_code == 201

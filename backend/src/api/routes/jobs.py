@@ -32,6 +32,47 @@ from src.services import job_scraper, JobScrapeError
 router = APIRouter()
 
 
+def build_job_response(job: Job, contacts: list | None = None) -> JobResponse:
+    """Build JobResponse without triggering lazy loads.
+
+    For newly created jobs, pass contacts=[] to avoid lazy loading.
+    For jobs with pre-loaded contacts, pass contacts=job.contacts.
+    """
+    contact_list = contacts if contacts is not None else []
+    return JobResponse(
+        id=job.id,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        work_location_type=job.work_location_type,
+        url=job.url,
+        description_raw=job.description_raw,
+        salary_min=job.salary_min,
+        salary_max=job.salary_max,
+        salary_currency=job.salary_currency,
+        employment_type=job.employment_type,
+        posted_at=job.posted_at,
+        target_role=job.target_role,
+        priority=job.priority,
+        notes=job.notes,
+        tags=job.tags,
+        status=job.status,
+        status_changed_at=job.status_changed_at,
+        closed_reason=job.closed_reason,
+        job_board=job.job_board,
+        job_board_id=job.job_board_id,
+        application_method=job.application_method,
+        applied_at=job.applied_at,
+        user_decline_reasons=job.user_decline_reasons,
+        company_decline_reasons=job.company_decline_reasons,
+        decline_notes=job.decline_notes,
+        contacts=contact_list,
+        contact_count=len(contact_list),
+    )
+
+
 @router.get(
     "",
     response_model=JobListResponse,
@@ -123,32 +164,16 @@ async def list_jobs(
         query.order_by(order_clause, Job.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
+        .options(selectinload(Job.contacts))
     )
 
     result = await db.execute(query)
     jobs = list(result.scalars().all())
 
-    # Get contact counts for these jobs
-    if jobs:
-        job_ids = [job.id for job in jobs]
-        contact_count_query = (
-            select(JobContact.job_id, func.count(JobContact.id).label("count"))
-            .where(JobContact.job_id.in_(job_ids))
-            .group_by(JobContact.job_id)
-        )
-        contact_counts_result = await db.execute(contact_count_query)
-        contact_counts = {row.job_id: row.count for row in contact_counts_result}
-    else:
-        contact_counts = {}
-
     total_pages = (total + page_size - 1) // page_size
 
-    # Build response with contact counts
-    items = []
-    for job in jobs:
-        job_data = JobResponse.model_validate(job)
-        job_data.contact_count = contact_counts.get(job.id, 0)
-        items.append(job_data)
+    # Build response with contacts (already loaded via selectinload)
+    items = [build_job_response(job, contacts=list(job.contacts)) for job in jobs]
 
     return JobListResponse(
         items=items,
@@ -183,7 +208,7 @@ async def list_jobs(
 async def ingest_job(
     db: DbSession,
     request: JobIngestRequest,
-) -> Job:
+) -> JobResponse:
     """Ingest a job from a URL."""
     url = str(request.url)
     try:
@@ -226,7 +251,9 @@ async def ingest_job(
     db.add(job)
     await db.flush()
     await db.refresh(job)
-    return job
+
+    # Build response (new jobs have no contacts)
+    return build_job_response(job, contacts=[])
 
 
 @router.post(
@@ -285,7 +312,7 @@ async def bulk_ingest_jobs(
         created.append(job)
 
     return JobBulkIngestResponse(
-        created=[JobResponse.model_validate(job) for job in created],
+        created=[build_job_response(job, contacts=[]) for job in created],
         failed=failed,
     )
 
@@ -302,9 +329,13 @@ async def bulk_update_job_status(
     status_update: JobBulkStatusUpdate,
 ) -> JobBulkStatusResponse:
     """Update status for multiple jobs."""
-    query = select(Job).where(
-        Job.id.in_(status_update.job_ids),
-        Job.deleted_at.is_(None),
+    query = (
+        select(Job)
+        .where(
+            Job.id.in_(status_update.job_ids),
+            Job.deleted_at.is_(None),
+        )
+        .options(selectinload(Job.contacts))
     )
     result = await db.execute(query)
     jobs = list(result.scalars().all())
@@ -322,8 +353,11 @@ async def bulk_update_job_status(
 
     await db.flush()
 
+    # Build responses with contacts (already loaded via selectinload)
+    updated_responses = [build_job_response(job, contacts=list(job.contacts)) for job in jobs]
+
     return JobBulkStatusResponse(
-        updated=[JobResponse.model_validate(job) for job in jobs],
+        updated=updated_responses,
         missing=missing,
     )
 
@@ -339,7 +373,7 @@ async def bulk_update_job_status(
 async def create_job(
     db: DbSession,
     job_in: JobCreate,
-) -> Job:
+) -> JobResponse:
     """Create a new job."""
     job = Job(
         title=job_in.title,
@@ -362,7 +396,40 @@ async def create_job(
     db.add(job)
     await db.flush()
     await db.refresh(job)
-    return job
+
+    # Build response manually to avoid lazy loading contacts on new job
+    return JobResponse(
+        id=job.id,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        work_location_type=job.work_location_type,
+        url=job.url,
+        description_raw=job.description_raw,
+        salary_min=job.salary_min,
+        salary_max=job.salary_max,
+        salary_currency=job.salary_currency,
+        employment_type=job.employment_type,
+        posted_at=job.posted_at,
+        target_role=job.target_role,
+        priority=job.priority,
+        notes=job.notes,
+        tags=job.tags,
+        status=job.status,
+        status_changed_at=job.status_changed_at,
+        closed_reason=job.closed_reason,
+        job_board=job.job_board,
+        job_board_id=job.job_board_id,
+        application_method=job.application_method,
+        applied_at=job.applied_at,
+        user_decline_reasons=job.user_decline_reasons,
+        company_decline_reasons=job.company_decline_reasons,
+        decline_notes=job.decline_notes,
+        contacts=[],
+        contact_count=0,
+    )
 
 
 @router.get(
@@ -395,11 +462,8 @@ async def get_job(
             detail=f"Job with id {job_id} not found",
         )
 
-    # Build response with contacts
-    job_response = JobResponse.model_validate(job)
-    job_response.contacts = [c for c in job.contacts]
-    job_response.contact_count = len(job.contacts)
-    return job_response
+    # Build response with contacts (already loaded via selectinload)
+    return build_job_response(job, contacts=list(job.contacts))
 
 
 @router.patch(
@@ -413,9 +477,13 @@ async def update_job(
     db: DbSession,
     job_id: UUID,
     job_in: JobUpdate,
-) -> Job:
+) -> JobResponse:
     """Update a job."""
-    query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
+    query = (
+        select(Job)
+        .where(Job.id == job_id, Job.deleted_at.is_(None))
+        .options(selectinload(Job.contacts))
+    )
     result = await db.execute(query)
     job = result.scalar_one_or_none()
 
@@ -438,8 +506,10 @@ async def update_job(
         setattr(job, field, value)
 
     await db.flush()
-    await db.refresh(job)
-    return job
+    await db.refresh(job, ["contacts"])
+
+    # Build response with contacts (contacts are eagerly loaded)
+    return build_job_response(job, contacts=list(job.contacts))
 
 
 @router.patch(
@@ -453,9 +523,13 @@ async def update_job_status(
     db: DbSession,
     job_id: UUID,
     status_update: JobStatusUpdate,
-) -> Job:
+) -> JobResponse:
     """Update a job's status."""
-    query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
+    query = (
+        select(Job)
+        .where(Job.id == job_id, Job.deleted_at.is_(None))
+        .options(selectinload(Job.contacts))
+    )
     result = await db.execute(query)
     job = result.scalar_one_or_none()
 
@@ -483,8 +557,10 @@ async def update_job_status(
         job.decline_notes = status_update.decline_notes
 
     await db.flush()
-    await db.refresh(job)
-    return job
+    await db.refresh(job, ["contacts"])
+
+    # Build response with contacts (contacts are eagerly loaded)
+    return build_job_response(job, contacts=list(job.contacts))
 
 
 @router.delete(

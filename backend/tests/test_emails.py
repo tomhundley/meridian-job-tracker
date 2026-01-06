@@ -6,10 +6,10 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_create_and_link_email(client, api_key_header):
+async def test_create_and_link_email(client, api_key_header, test_job_payload):
     job_response = await client.post(
         "/api/v1/jobs",
-        json={"title": "Engineer", "company": "Acme"},
+        json=test_job_payload(title="Engineer", company="Acme"),
         headers=api_key_header,
     )
     job_id = job_response.json()["id"]
