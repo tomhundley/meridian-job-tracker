@@ -15,6 +15,7 @@ from .job import (
     RoleType,
     ApplicationMethod,
     WorkLocationType,
+    EmploymentType,
 )
 from .cover_letter import (
     CoverLetterCreate,
@@ -63,6 +64,7 @@ __all__ = [
     "RoleType",
     "ApplicationMethod",
     "WorkLocationType",
+    "EmploymentType",
     # Cover letter schemas
     "CoverLetterCreate",
     "CoverLetterResponse",

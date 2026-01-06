@@ -1,6 +1,6 @@
 """SQLAlchemy models for the Meridian Job Tracker."""
 
-from .job import Job, JobStatus, RoleType, ApplicationMethod, WorkLocationType
+from .job import Job, JobStatus, RoleType, ApplicationMethod, WorkLocationType, EmploymentType
 from .cover_letter import CoverLetter
 from .email import Email
 from .application_attempt import ApplicationAttempt
@@ -20,6 +20,7 @@ __all__ = [
     "RoleType",
     "ApplicationMethod",
     "WorkLocationType",
+    "EmploymentType",
     "CoverLetter",
     "Email",
     "ApplicationAttempt",

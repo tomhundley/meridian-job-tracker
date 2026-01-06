@@ -71,6 +71,17 @@ class WorkLocationType(str, enum.Enum):
     ON_SITE = "on_site"
 
 
+class EmploymentType(str, enum.Enum):
+    """Employment type for the job."""
+
+    FULL_TIME = "full_time"
+    PART_TIME = "part_time"
+    CONTRACT = "contract"
+    CONTRACT_TO_HIRE = "contract_to_hire"
+    TEMPORARY = "temporary"
+    INTERNSHIP = "internship"
+
+
 class Job(Base):
     """Job posting being tracked for applications."""
 
@@ -115,6 +126,14 @@ class Job(Base):
     # Job description
     description_raw: Mapped[str | None] = mapped_column(Text)
     source_html: Mapped[str | None] = mapped_column(Text)
+
+    # Compensation (all optional)
+    salary_min: Mapped[int | None] = mapped_column(Integer)
+    salary_max: Mapped[int | None] = mapped_column(Integer)
+    salary_currency: Mapped[str | None] = mapped_column(String(3), default="USD")
+    employment_type: Mapped[EmploymentType | None] = mapped_column(
+        Enum(EmploymentType, name="employment_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
+    )
 
     # Status tracking
     status: Mapped[JobStatus] = mapped_column(

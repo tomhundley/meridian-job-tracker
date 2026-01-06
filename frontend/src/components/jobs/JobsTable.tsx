@@ -16,6 +16,10 @@ interface Job {
   priority: number;
   created_at: string;
   applied_at: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
+  employment_type: string | null;
 }
 
 interface JobsTableProps {
@@ -23,6 +27,31 @@ interface JobsTableProps {
   status?: string;
   workLocationType?: string;
   minPriority?: number;
+  minSalary?: number;
+  maxSalary?: number;
+}
+
+function formatSalary(min: number | null, max: number | null, currency: string | null): string {
+  const curr = currency || "USD";
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: curr,
+    maximumFractionDigits: 0,
+  });
+
+  if (min && max) {
+    if (min === max) {
+      return formatter.format(min);
+    }
+    return `${formatter.format(min)} - ${formatter.format(max)}`;
+  }
+  if (min) {
+    return `${formatter.format(min)}+`;
+  }
+  if (max) {
+    return `Up to ${formatter.format(max)}`;
+  }
+  return "-";
 }
 
 const locationTypeLabels: Record<string, string> = {
@@ -31,13 +60,15 @@ const locationTypeLabels: Record<string, string> = {
   on_site: "On-site",
 };
 
-export function JobsTable({ search, status, workLocationType, minPriority }: JobsTableProps) {
+export function JobsTable({ search, status, workLocationType, minPriority, minSalary, maxSalary }: JobsTableProps) {
   // Build query string
   const params = new URLSearchParams();
   if (search) params.append("search", search);
   if (status) params.append("status", status);
   if (workLocationType) params.append("work_location_type", workLocationType);
   if (minPriority) params.append("min_priority", minPriority.toString());
+  if (minSalary) params.append("min_salary", minSalary.toString());
+  if (maxSalary) params.append("max_salary", maxSalary.toString());
   const queryString = params.toString();
   const url = `/api/jobs${queryString ? `?${queryString}` : ""}`;
 
@@ -95,6 +126,9 @@ export function JobsTable({ search, status, workLocationType, minPriority }: Job
               Type
             </th>
             <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
+              Salary
+            </th>
+            <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
               Status
             </th>
             <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
@@ -133,6 +167,9 @@ export function JobsTable({ search, status, workLocationType, minPriority }: Job
                 ) : (
                   <span className="text-[var(--color-text-tertiary)]">-</span>
                 )}
+              </td>
+              <td className="px-4 py-3 text-[var(--color-text-secondary)] text-sm">
+                {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
               </td>
               <td className="px-4 py-3">
                 <StatusBadge status={job.status} />

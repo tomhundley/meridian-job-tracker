@@ -28,15 +28,26 @@ const priorityLevels = [
   { value: 5, label: "5", minPriority: 81 },
 ];
 
+// Salary range presets (in thousands)
+const salaryRanges = [
+  { label: "All", minSalary: 0, maxSalary: 0 },
+  { label: "$100k+", minSalary: 100000, maxSalary: 0 },
+  { label: "$150k+", minSalary: 150000, maxSalary: 0 },
+  { label: "$200k+", minSalary: 200000, maxSalary: 0 },
+  { label: "$250k+", minSalary: 250000, maxSalary: 0 },
+];
+
 interface JobFiltersProps {
   search: string;
   status: string;
   workLocationType: string;
   minPriority: number;
+  minSalary: number;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onWorkLocationTypeChange: (value: string) => void;
   onMinPriorityChange: (value: number) => void;
+  onMinSalaryChange: (value: number) => void;
 }
 
 export function JobFilters({
@@ -44,10 +55,12 @@ export function JobFilters({
   status,
   workLocationType,
   minPriority,
+  minSalary,
   onSearchChange,
   onStatusChange,
   onWorkLocationTypeChange,
   onMinPriorityChange,
+  onMinSalaryChange,
 }: JobFiltersProps) {
   // Find current priority level from minPriority value
   const currentPriorityLevel = priorityLevels.find(
@@ -122,6 +135,23 @@ export function JobFilters({
                   {p.value < 5 && <span className="text-xs">+</span>}
                 </>
               )}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2 items-center">
+          <span className="text-sm text-[var(--color-text-tertiary)]">Salary:</span>
+          {salaryRanges.map((s) => (
+            <button
+              key={s.label}
+              onClick={() => onMinSalaryChange(s.minSalary)}
+              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
+                minSalary === s.minSalary
+                  ? "bg-[var(--color-accent)] text-white"
+                  : "bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]"
+              }`}
+            >
+              {s.label}
             </button>
           ))}
         </div>

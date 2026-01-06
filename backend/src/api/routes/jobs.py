@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from src.api.deps import DbSession, require_permissions
-from src.models import Job, CoverLetter, JobStatus as ModelJobStatus, RoleType as ModelRoleType, WorkLocationType as ModelWorkLocationType
+from src.models import Job, CoverLetter, JobStatus as ModelJobStatus, RoleType as ModelRoleType, WorkLocationType as ModelWorkLocationType, EmploymentType as ModelEmploymentType
 from src.schemas import (
     JobCreate,
     JobIngestRequest,
@@ -48,6 +48,8 @@ async def list_jobs(
     target_role: RoleType | None = None,
     work_location_type: WorkLocationType | None = None,
     min_priority: Annotated[int | None, Query(ge=0, le=100)] = None,
+    min_salary: Annotated[int | None, Query(ge=0, description="Minimum salary filter")] = None,
+    max_salary: Annotated[int | None, Query(ge=0, description="Maximum salary filter")] = None,
     search: str | None = None,
 ) -> JobListResponse:
     """List all jobs with optional filters and pagination."""
@@ -65,6 +67,16 @@ async def list_jobs(
         query = query.where(Job.work_location_type == ModelWorkLocationType(work_location_type.value))
     if min_priority is not None:
         query = query.where(Job.priority >= min_priority)
+    if min_salary is not None:
+        # Filter jobs where max salary is at least min_salary (or min salary if max is null)
+        query = query.where(
+            (Job.salary_max >= min_salary) | ((Job.salary_max.is_(None)) & (Job.salary_min >= min_salary))
+        )
+    if max_salary is not None:
+        # Filter jobs where min salary is at most max_salary (or max salary if min is null)
+        query = query.where(
+            (Job.salary_min <= max_salary) | ((Job.salary_min.is_(None)) & (Job.salary_max <= max_salary))
+        )
     if search:
         # Simple search on title, company, description
         search_filter = (
@@ -285,8 +297,13 @@ async def create_job(
         title=job_in.title,
         company=job_in.company,
         location=job_in.location,
+        work_location_type=ModelWorkLocationType(job_in.work_location_type.value) if job_in.work_location_type else None,
         url=job_in.url,
         description_raw=job_in.description_raw,
+        salary_min=job_in.salary_min,
+        salary_max=job_in.salary_max,
+        salary_currency=job_in.salary_currency,
+        employment_type=ModelEmploymentType(job_in.employment_type.value) if job_in.employment_type else None,
         target_role=ModelRoleType(job_in.target_role.value) if job_in.target_role else None,
         priority=job_in.priority,
         notes=job_in.notes,
@@ -358,8 +375,13 @@ async def update_job(
     # Update fields
     update_data = job_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        if field == "target_role" and value is not None:
-            value = ModelRoleType(value.value)
+        if value is not None:
+            if field == "target_role":
+                value = ModelRoleType(value.value)
+            elif field == "employment_type":
+                value = ModelEmploymentType(value.value)
+            elif field == "work_location_type":
+                value = ModelWorkLocationType(value.value)
         setattr(job, field, value)
 
     await db.flush()

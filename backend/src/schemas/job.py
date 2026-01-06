@@ -52,6 +52,17 @@ class WorkLocationType(str, Enum):
     ON_SITE = "on_site"
 
 
+class EmploymentType(str, Enum):
+    """Employment type."""
+
+    FULL_TIME = "full_time"
+    PART_TIME = "part_time"
+    CONTRACT = "contract"
+    CONTRACT_TO_HIRE = "contract_to_hire"
+    TEMPORARY = "temporary"
+    INTERNSHIP = "internship"
+
+
 class JobBase(BaseModel):
     """Base schema for Job."""
 
@@ -61,6 +72,10 @@ class JobBase(BaseModel):
     work_location_type: WorkLocationType | None = None
     url: str | None = None
     description_raw: str | None = None
+    salary_min: int | None = Field(None, ge=0, description="Minimum annual salary")
+    salary_max: int | None = Field(None, ge=0, description="Maximum annual salary")
+    salary_currency: str | None = Field("USD", max_length=3, description="ISO 4217 currency code")
+    employment_type: EmploymentType | None = None
     target_role: RoleType | None = None
     priority: int = Field(50, ge=0, le=100)
     notes: str | None = None
@@ -91,6 +106,10 @@ class JobUpdate(BaseModel):
     work_location_type: WorkLocationType | None = None
     url: str | None = None
     description_raw: str | None = None
+    salary_min: int | None = Field(None, ge=0)
+    salary_max: int | None = Field(None, ge=0)
+    salary_currency: str | None = Field(None, max_length=3)
+    employment_type: EmploymentType | None = None
     target_role: RoleType | None = None
     priority: int | None = Field(None, ge=0, le=100)
     notes: str | None = None

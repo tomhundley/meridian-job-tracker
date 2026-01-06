@@ -36,6 +36,15 @@ CREATE TYPE application_method AS ENUM (
     'manual'
 );
 
+CREATE TYPE employment_type AS ENUM (
+    'full_time',
+    'part_time',
+    'contract',
+    'contract_to_hire',
+    'temporary',
+    'internship'
+);
+
 -- Jobs table
 CREATE TABLE jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -53,6 +62,12 @@ CREATE TABLE jobs (
     -- Job description
     description_raw TEXT,
     source_html TEXT,
+
+    -- Compensation (all optional)
+    salary_min INTEGER,
+    salary_max INTEGER,
+    salary_currency VARCHAR(3) DEFAULT 'USD',
+    employment_type employment_type,
 
     -- Status tracking
     status job_status NOT NULL DEFAULT 'saved',
@@ -299,6 +314,8 @@ CREATE INDEX idx_jobs_priority ON jobs(priority DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_jobs_target_role ON jobs(target_role) WHERE deleted_at IS NULL;
 CREATE INDEX idx_jobs_created_at ON jobs(created_at DESC);
 CREATE INDEX idx_jobs_applied_at ON jobs(applied_at DESC) WHERE applied_at IS NOT NULL;
+CREATE INDEX idx_jobs_salary ON jobs(salary_min, salary_max) WHERE salary_min IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX idx_jobs_employment_type ON jobs(employment_type) WHERE employment_type IS NOT NULL AND deleted_at IS NULL;
 
 CREATE INDEX idx_cover_letters_job_id ON cover_letters(job_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_cover_letters_is_current ON cover_letters(job_id, is_current) WHERE is_current = true AND deleted_at IS NULL;
@@ -394,6 +411,10 @@ COMMENT ON COLUMN jobs.status IS 'Current status in the application pipeline';
 COMMENT ON COLUMN jobs.user_decline_reasons IS 'Array of reason codes when user passes on a job';
 COMMENT ON COLUMN jobs.company_decline_reasons IS 'Array of reason codes when company rejects user';
 COMMENT ON COLUMN jobs.decline_notes IS 'Additional notes about the decline';
+COMMENT ON COLUMN jobs.salary_min IS 'Minimum salary (annual, in salary_currency)';
+COMMENT ON COLUMN jobs.salary_max IS 'Maximum salary (annual, in salary_currency)';
+COMMENT ON COLUMN jobs.salary_currency IS 'ISO 4217 currency code (default USD)';
+COMMENT ON COLUMN jobs.employment_type IS 'Type: full_time, part_time, contract, contract_to_hire, temporary, internship';
 COMMENT ON COLUMN cover_letters.is_current IS 'Whether this is the current version for the job';
 COMMENT ON COLUMN application_attempts.requires_confirmation IS 'Whether human confirmation is needed before submitting';
 
