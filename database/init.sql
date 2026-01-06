@@ -71,6 +71,11 @@ CREATE TABLE jobs (
     application_method application_method,
     applied_at TIMESTAMPTZ,
 
+    -- Decline tracking (arrays for multiple reasons)
+    user_decline_reasons VARCHAR(50)[],
+    company_decline_reasons VARCHAR(50)[],
+    decline_notes TEXT,
+
     -- Soft delete
     deleted_at TIMESTAMPTZ,
 
@@ -177,6 +182,89 @@ CREATE TABLE webhooks (
     is_active BOOLEAN NOT NULL DEFAULT true
 );
 
+-- User decline reasons lookup table
+CREATE TABLE user_decline_reasons (
+    code VARCHAR(50) PRIMARY KEY,
+    display_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Company decline reasons lookup table
+CREATE TABLE company_decline_reasons (
+    code VARCHAR(50) PRIMARY KEY,
+    display_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed user decline reasons
+INSERT INTO user_decline_reasons (code, display_name, category, sort_order) VALUES
+-- Compensation
+('salary_too_low', 'Salary below expectations', 'compensation', 1),
+('benefits_inadequate', 'Benefits not competitive', 'compensation', 2),
+('no_equity', 'No equity/stock options', 'compensation', 3),
+-- Location & Remote
+('not_remote', 'Not fully remote (hybrid/onsite required)', 'location', 10),
+('wrong_location', 'Location not suitable', 'location', 11),
+('commute_too_long', 'Commute too long', 'location', 12),
+('relocation_required', 'Would require relocation', 'location', 13),
+-- Role Fit
+('underqualified', 'Not qualified for role', 'role_fit', 20),
+('overqualified', 'Role below experience level', 'role_fit', 21),
+('wrong_responsibilities', 'Job duties not aligned with goals', 'role_fit', 22),
+('wrong_industry', 'Industry not of interest', 'role_fit', 23),
+('wrong_tech_stack', 'Technology stack not preferred', 'role_fit', 24),
+-- Company Concerns
+('culture_concerns', 'Company culture red flags', 'company', 30),
+('bad_reviews', 'Negative Glassdoor/reviews', 'company', 31),
+('company_too_small', 'Company too small', 'company', 32),
+('company_too_large', 'Company too large', 'company', 33),
+('financial_instability', 'Company financial concerns', 'company', 34),
+('recent_layoffs', 'Recent layoffs or instability', 'company', 35),
+-- Process Issues
+('slow_process', 'Hiring process too slow', 'process', 40),
+('poor_communication', 'Poor recruiter communication', 'process', 41),
+('bad_interview', 'Negative interview experience', 'process', 42),
+-- Personal
+('found_better', 'Found better opportunity', 'personal', 50),
+('timing_not_right', 'Timing not right', 'personal', 51),
+('bad_feeling', 'Gut feeling / intuition', 'personal', 52),
+('lost_interest', 'Lost interest in role', 'personal', 53),
+('other', 'Other reason', 'personal', 99);
+
+-- Seed company decline reasons
+INSERT INTO company_decline_reasons (code, display_name, category, sort_order) VALUES
+-- Candidate Selection
+('selected_other', 'Selected another candidate', 'selection', 1),
+('position_filled_internal', 'Filled internally', 'selection', 2),
+('position_closed', 'Position closed/budget cut', 'selection', 3),
+-- Experience & Skills
+('insufficient_experience', 'Not enough experience', 'experience', 10),
+('overqualified', 'Overqualified', 'experience', 11),
+('skills_mismatch', 'Skills don''t match requirements', 'experience', 12),
+('failed_technical', 'Did not pass technical assessment', 'experience', 13),
+-- Fit & Expectations
+('culture_fit', 'Not a culture fit', 'fit', 20),
+('salary_too_high', 'Salary expectations too high', 'fit', 21),
+('availability_issues', 'Start date/availability issues', 'fit', 22),
+-- Verification
+('background_check', 'Background check issue', 'verification', 30),
+('reference_issue', 'Reference check concern', 'verification', 31),
+-- Interview
+('interview_performance', 'Interview performance', 'interview', 40),
+('communication_concerns', 'Communication concerns', 'interview', 41),
+-- Other
+('ghosted', 'No response / ghosted', 'other', 50),
+('generic_rejection', 'Generic "not moving forward"', 'other', 51),
+('other', 'Other reason', 'other', 99);
+
 -- Indexes
 CREATE INDEX idx_jobs_status ON jobs(status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_jobs_company ON jobs(company) WHERE deleted_at IS NULL;
@@ -196,6 +284,11 @@ CREATE INDEX idx_application_attempts_pending ON application_attempts(job_id) WH
 
 CREATE INDEX idx_agents_api_key ON agents(api_key);
 CREATE INDEX idx_webhooks_active ON webhooks(is_active) WHERE is_active = true;
+
+CREATE INDEX idx_user_decline_category ON user_decline_reasons(category, sort_order);
+CREATE INDEX idx_company_decline_category ON company_decline_reasons(category, sort_order);
+CREATE INDEX idx_jobs_user_decline ON jobs USING gin(user_decline_reasons) WHERE user_decline_reasons IS NOT NULL;
+CREATE INDEX idx_jobs_company_decline ON jobs USING gin(company_decline_reasons) WHERE company_decline_reasons IS NOT NULL;
 
 -- Full text search on job descriptions
 CREATE INDEX idx_jobs_fts ON jobs
@@ -260,5 +353,11 @@ COMMENT ON TABLE application_attempts IS 'Automation attempts for job applicatio
 
 COMMENT ON COLUMN jobs.priority IS '0-100 scale, higher = more important';
 COMMENT ON COLUMN jobs.status IS 'Current status in the application pipeline';
+COMMENT ON COLUMN jobs.user_decline_reasons IS 'Array of reason codes when user passes on a job';
+COMMENT ON COLUMN jobs.company_decline_reasons IS 'Array of reason codes when company rejects user';
+COMMENT ON COLUMN jobs.decline_notes IS 'Additional notes about the decline';
 COMMENT ON COLUMN cover_letters.is_current IS 'Whether this is the current version for the job';
 COMMENT ON COLUMN application_attempts.requires_confirmation IS 'Whether human confirmation is needed before submitting';
+
+COMMENT ON TABLE user_decline_reasons IS 'Lookup table for reasons user passes on a job';
+COMMENT ON TABLE company_decline_reasons IS 'Lookup table for reasons company rejects user';

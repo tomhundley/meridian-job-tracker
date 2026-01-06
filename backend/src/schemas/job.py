@@ -86,6 +86,9 @@ class JobUpdate(BaseModel):
     notes: str | None = None
     tags: list[str] | None = None
     closed_reason: str | None = Field(None, max_length=100)
+    user_decline_reasons: list[str] | None = None
+    company_decline_reasons: list[str] | None = None
+    decline_notes: str | None = None
 
 
 class JobStatusUpdate(BaseModel):
@@ -93,6 +96,9 @@ class JobStatusUpdate(BaseModel):
 
     status: JobStatus
     closed_reason: str | None = Field(None, max_length=100)
+    user_decline_reasons: list[str] | None = None
+    company_decline_reasons: list[str] | None = None
+    decline_notes: str | None = None
 
 
 class JobBulkStatusUpdate(BaseModel):
@@ -118,6 +124,9 @@ class JobResponse(JobBase):
     job_board_id: str | None = None
     application_method: ApplicationMethod | None = None
     applied_at: datetime | None = None
+    user_decline_reasons: list[str] | None = None
+    company_decline_reasons: list[str] | None = None
+    decline_notes: str | None = None
 
 
 class JobBulkIngestRequest(BaseModel):

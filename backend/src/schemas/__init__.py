@@ -26,6 +26,19 @@ from .email import (
 )
 from .agent import AgentCreate, AgentResponse
 from .webhook import WebhookCreate, WebhookResponse
+from .discovery import (
+    LinkedInSearchRequest,
+    LinkedInSearchResponse,
+    JobDiscoveryItem,
+    BulkDiscoveryRequest,
+    BulkDiscoveryResponse,
+)
+from .decline_reason import (
+    DeclineReasonResponse,
+    CategoryWithReasons,
+    DeclineReasonsListResponse,
+    DeclineUpdate,
+)
 
 __all__ = [
     # Job schemas
@@ -55,4 +68,15 @@ __all__ = [
     # Webhook schemas
     "WebhookCreate",
     "WebhookResponse",
+    # Discovery schemas
+    "LinkedInSearchRequest",
+    "LinkedInSearchResponse",
+    "JobDiscoveryItem",
+    "BulkDiscoveryRequest",
+    "BulkDiscoveryResponse",
+    # Decline reason schemas
+    "DeclineReasonResponse",
+    "CategoryWithReasons",
+    "DeclineReasonsListResponse",
+    "DeclineUpdate",
 ]

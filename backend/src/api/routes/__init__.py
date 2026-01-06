@@ -8,6 +8,8 @@ from .emails import router as emails_router
 from .agents import router as agents_router
 from .webhooks import router as webhooks_router
 from .health import router as health_router
+from .discovery import router as discovery_router
+from .decline_reasons import router as decline_reasons_router
 
 api_router = APIRouter()
 
@@ -17,3 +19,5 @@ api_router.include_router(cover_letters_router, prefix="/cover-letters", tags=["
 api_router.include_router(emails_router, prefix="/emails", tags=["emails"])
 api_router.include_router(agents_router, prefix="/agents", tags=["agents"])
 api_router.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
+api_router.include_router(discovery_router)
+api_router.include_router(decline_reasons_router, prefix="/decline-reasons", tags=["decline-reasons"])

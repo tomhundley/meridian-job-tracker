@@ -106,7 +106,7 @@ class Job(Base):
 
     # Status tracking
     status: Mapped[JobStatus] = mapped_column(
-        Enum(JobStatus, name="job_status", create_type=False),
+        Enum(JobStatus, name="job_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         default=JobStatus.SAVED,
         nullable=False,
     )
@@ -119,7 +119,7 @@ class Job(Base):
 
     # Role matching
     target_role: Mapped[RoleType | None] = mapped_column(
-        Enum(RoleType, name="role_type", create_type=False),
+        Enum(RoleType, name="role_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
     )
 
     # Priority and organization
@@ -129,9 +129,14 @@ class Job(Base):
 
     # Application details
     application_method: Mapped[ApplicationMethod | None] = mapped_column(
-        Enum(ApplicationMethod, name="application_method", create_type=False),
+        Enum(ApplicationMethod, name="application_method", create_type=False, values_callable=lambda x: [e.value for e in x]),
     )
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Decline tracking (arrays for multiple reasons)
+    user_decline_reasons: Mapped[list[str] | None] = mapped_column(ARRAY(String(50)))
+    company_decline_reasons: Mapped[list[str] | None] = mapped_column(ARRAY(String(50)))
+    decline_notes: Mapped[str | None] = mapped_column(Text)
 
     # Soft delete
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
