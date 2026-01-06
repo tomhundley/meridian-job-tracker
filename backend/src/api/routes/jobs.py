@@ -58,6 +58,10 @@ def build_job_response(job: Job, contacts: list | None = None) -> JobResponse:
         priority=job.priority,
         notes=job.notes,
         tags=job.tags,
+        is_easy_apply=job.is_easy_apply,
+        is_favorite=job.is_favorite,
+        is_perfect_fit=job.is_perfect_fit,
+        is_ai_forward=job.is_ai_forward,
         status=job.status,
         status_changed_at=job.status_changed_at,
         closed_reason=job.closed_reason,
@@ -88,6 +92,10 @@ async def list_jobs(
     company: str | None = None,
     target_role: RoleType | None = None,
     work_location_type: WorkLocationType | None = None,
+    is_easy_apply: Annotated[bool | None, Query(description="Filter by Easy Apply status")] = None,
+    is_favorite: Annotated[bool | None, Query(description="Filter by favorite status")] = None,
+    is_perfect_fit: Annotated[bool | None, Query(description="Filter by perfect fit status")] = None,
+    is_ai_forward: Annotated[bool | None, Query(description="Filter by AI-forward status")] = None,
     min_priority: Annotated[int | None, Query(ge=0, le=100)] = None,
     min_salary: Annotated[int | None, Query(ge=0, description="Minimum salary filter")] = None,
     max_salary: Annotated[int | None, Query(ge=0, description="Maximum salary filter")] = None,
@@ -108,6 +116,14 @@ async def list_jobs(
         query = query.where(Job.target_role == ModelRoleType(target_role.value))
     if work_location_type:
         query = query.where(Job.work_location_type == ModelWorkLocationType(work_location_type.value))
+    if is_easy_apply is not None:
+        query = query.where(Job.is_easy_apply == is_easy_apply)
+    if is_favorite is not None:
+        query = query.where(Job.is_favorite == is_favorite)
+    if is_perfect_fit is not None:
+        query = query.where(Job.is_perfect_fit == is_perfect_fit)
+    if is_ai_forward is not None:
+        query = query.where(Job.is_ai_forward == is_ai_forward)
     if min_priority is not None:
         query = query.where(Job.priority >= min_priority)
     if min_salary is not None:
@@ -246,6 +262,7 @@ async def ingest_job(
         job_board_id=scraped.source_id,
         description_raw=scraped.description,
         source_html=scraped.raw_html,
+        is_easy_apply=scraped.is_easy_apply,
         notes=request.notes,
     )
     db.add(job)
@@ -305,6 +322,7 @@ async def bulk_ingest_jobs(
             job_board_id=scraped.source_id,
             description_raw=scraped.description,
             source_html=scraped.raw_html,
+            is_easy_apply=scraped.is_easy_apply,
             notes=job_request.notes,
         )
         db.add(job)

@@ -9,6 +9,10 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [workLocationType, setWorkLocationType] = useState("");
+  const [isEasyApply, setIsEasyApply] = useState("");
+  const [isFavorite, setIsFavorite] = useState("");
+  const [isPerfectFit, setIsPerfectFit] = useState("");
+  const [isAiForward, setIsAiForward] = useState("");
   const [minPriority, setMinPriority] = useState(0);
   const [minSalary, setMinSalary] = useState(0);
   const [sortBy, setSortBy] = useState<SortField>("updated_at");
@@ -36,11 +40,19 @@ export default function DashboardPage() {
         search={search}
         status={status}
         workLocationType={workLocationType}
+        isEasyApply={isEasyApply}
+        isFavorite={isFavorite}
+        isPerfectFit={isPerfectFit}
+        isAiForward={isAiForward}
         minPriority={minPriority}
         minSalary={minSalary}
         onSearchChange={setSearch}
         onStatusChange={setStatus}
         onWorkLocationTypeChange={setWorkLocationType}
+        onIsEasyApplyChange={setIsEasyApply}
+        onIsFavoriteChange={setIsFavorite}
+        onIsPerfectFitChange={setIsPerfectFit}
+        onIsAiForwardChange={setIsAiForward}
         onMinPriorityChange={setMinPriority}
         onMinSalaryChange={setMinSalary}
       />
@@ -48,6 +60,10 @@ export default function DashboardPage() {
         search={search}
         status={status}
         workLocationType={workLocationType}
+        isEasyApply={isEasyApply === "true" ? true : isEasyApply === "false" ? false : undefined}
+        isFavorite={isFavorite === "true" ? true : isFavorite === "false" ? false : undefined}
+        isPerfectFit={isPerfectFit === "true" ? true : isPerfectFit === "false" ? false : undefined}
+        isAiForward={isAiForward === "true" ? true : isAiForward === "false" ? false : undefined}
         minPriority={minPriority}
         minSalary={minSalary}
         sortBy={sortBy}

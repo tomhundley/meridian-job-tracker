@@ -23,6 +23,10 @@ interface Job {
   salary_currency: string | null;
   employment_type: string | null;
   contact_count: number;
+  is_easy_apply: boolean;
+  is_favorite: boolean;
+  is_perfect_fit: boolean;
+  is_ai_forward: boolean;
 }
 
 export type SortField = "updated_at" | "created_at" | "priority" | "salary" | "title" | "company";
@@ -32,6 +36,10 @@ interface JobsTableProps {
   search?: string;
   status?: string;
   workLocationType?: string;
+  isEasyApply?: boolean;
+  isFavorite?: boolean;
+  isPerfectFit?: boolean;
+  isAiForward?: boolean;
   minPriority?: number;
   minSalary?: number;
   maxSalary?: number;
@@ -81,6 +89,10 @@ export function JobsTable({
   search,
   status,
   workLocationType,
+  isEasyApply,
+  isFavorite,
+  isPerfectFit,
+  isAiForward,
   minPriority,
   minSalary,
   maxSalary,
@@ -93,6 +105,10 @@ export function JobsTable({
   if (search) params.append("search", search);
   if (status) params.append("status", status);
   if (workLocationType) params.append("work_location_type", workLocationType);
+  if (isEasyApply !== undefined) params.append("is_easy_apply", isEasyApply.toString());
+  if (isFavorite !== undefined) params.append("is_favorite", isFavorite.toString());
+  if (isPerfectFit !== undefined) params.append("is_perfect_fit", isPerfectFit.toString());
+  if (isAiForward !== undefined) params.append("is_ai_forward", isAiForward.toString());
   if (minPriority) params.append("min_priority", minPriority.toString());
   if (minSalary) params.append("min_salary", minSalary.toString());
   if (maxSalary) params.append("max_salary", maxSalary.toString());
@@ -233,12 +249,34 @@ export function JobsTable({
               className="border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-elevated)] transition-colors"
             >
               <td className="px-4 py-3">
-                <Link
-                  href={`/dashboard/jobs/${job.id}`}
-                  className="font-medium hover:text-[var(--color-accent)] transition-colors"
-                >
-                  {job.title}
-                </Link>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Link
+                    href={`/dashboard/jobs/${job.id}`}
+                    className="font-medium hover:text-[var(--color-accent)] transition-colors"
+                  >
+                    {job.title}
+                  </Link>
+                  {job.is_favorite && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-yellow-500/20 text-yellow-400" title="Favorite">
+                      ★
+                    </span>
+                  )}
+                  {job.is_perfect_fit && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/20 text-purple-400 whitespace-nowrap" title="Perfect Fit">
+                      Perfect
+                    </span>
+                  )}
+                  {job.is_ai_forward && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-500/20 text-blue-400 whitespace-nowrap" title="AI Forward">
+                      AI
+                    </span>
+                  )}
+                  {job.is_easy_apply && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-green-500/20 text-green-400 whitespace-nowrap" title="Easy Apply">
+                      Easy
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="px-1 py-3 text-center">
                 {job.contact_count > 0 && (

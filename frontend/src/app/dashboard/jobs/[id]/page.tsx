@@ -48,6 +48,10 @@ interface Job {
   applied_at: string | null;
   created_at: string;
   updated_at: string;
+  is_easy_apply: boolean;
+  is_favorite: boolean;
+  is_perfect_fit: boolean;
+  is_ai_forward: boolean;
   user_decline_reasons: string[] | null;
   company_decline_reasons: string[] | null;
   decline_notes: string | null;
@@ -250,7 +254,29 @@ export default function JobDetailPage() {
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">{job.title}</h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold">{job.title}</h1>
+              {job.is_favorite && (
+                <span className="px-2 py-1 text-xs font-medium rounded bg-yellow-500/20 text-yellow-400">
+                  ★ Favorite
+                </span>
+              )}
+              {job.is_perfect_fit && (
+                <span className="px-2 py-1 text-xs font-medium rounded bg-purple-500/20 text-purple-400">
+                  Perfect Fit
+                </span>
+              )}
+              {job.is_ai_forward && (
+                <span className="px-2 py-1 text-xs font-medium rounded bg-blue-500/20 text-blue-400">
+                  AI Forward
+                </span>
+              )}
+              {job.is_easy_apply && (
+                <span className="px-2 py-1 text-xs font-medium rounded bg-green-500/20 text-green-400">
+                  Easy Apply
+                </span>
+              )}
+            </div>
             <p className="text-[var(--color-text-secondary)]">{job.company}</p>
           </div>
         </div>
@@ -346,6 +372,53 @@ export default function JobDetailPage() {
                   <span>{job.priority}</span>
                   <span>High</span>
                 </div>
+              </div>
+            </div>
+
+            {/* User Preference Flags */}
+            <div className="mt-6 pt-6 border-t border-[var(--color-border-subtle)]">
+              <h3 className="text-base font-semibold mb-4">Job Flags</h3>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={job.is_favorite}
+                    onChange={(e) => handleUpdateJob({ is_favorite: e.target.checked })}
+                    disabled={isUpdating}
+                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-yellow-500 focus:ring-yellow-500"
+                  />
+                  <span className="text-sm">★ Favorite</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={job.is_perfect_fit}
+                    onChange={(e) => handleUpdateJob({ is_perfect_fit: e.target.checked })}
+                    disabled={isUpdating}
+                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-purple-500 focus:ring-purple-500"
+                  />
+                  <span className="text-sm">Perfect Fit</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={job.is_ai_forward}
+                    onChange={(e) => handleUpdateJob({ is_ai_forward: e.target.checked })}
+                    disabled={isUpdating}
+                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-blue-500 focus:ring-blue-500"
+                  />
+                  <span className="text-sm">AI Forward</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={job.is_easy_apply}
+                    onChange={(e) => handleUpdateJob({ is_easy_apply: e.target.checked })}
+                    disabled={isUpdating}
+                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-green-500 focus:ring-green-500"
+                  />
+                  <span className="text-sm">Easy Apply</span>
+                </label>
               </div>
             </div>
 

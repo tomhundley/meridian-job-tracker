@@ -161,6 +161,14 @@ class Job(Base):
     # Job posting date (when posted on job board)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # LinkedIn Easy Apply flag
+    is_easy_apply: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # User preference flags
+    is_favorite: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_perfect_fit: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_ai_forward: Mapped[bool] = mapped_column(default=False, nullable=False)
+
     # Application details
     application_method: Mapped[ApplicationMethod | None] = mapped_column(
         Enum(ApplicationMethod, name="application_method", create_type=False, values_callable=lambda x: [e.value for e in x]),

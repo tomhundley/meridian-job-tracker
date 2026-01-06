@@ -28,6 +28,7 @@ class ScrapedJob:
     source: str
     source_id: str | None
     raw_html: str
+    is_easy_apply: bool = False
 
 
 SUPPORTED_SOURCES = {"linkedin", "indeed", "greenhouse", "lever", "workday"}
@@ -156,6 +157,42 @@ def extract_source_id(url: str, source: str) -> str | None:
         if match:
             return match.group(1)
     return None
+
+
+def _detect_linkedin_easy_apply(soup: BeautifulSoup) -> bool:
+    """Detect if a LinkedIn job has Easy Apply enabled."""
+    # Check for Easy Apply button by class
+    easy_apply_selectors = [
+        "button.jobs-apply-button",
+        "button[data-job-id]",
+        ".jobs-apply-button--top-card",
+        ".apply-button--top-card",
+    ]
+    for selector in easy_apply_selectors:
+        button = soup.select_one(selector)
+        if button:
+            # Check button text for "Easy Apply"
+            text = button.get_text(strip=True).lower()
+            if "easy apply" in text:
+                return True
+
+    # Check for any element containing "Easy Apply" text
+    easy_apply_patterns = [
+        "span.jobs-apply-button__label",
+        ".easy-apply-text",
+    ]
+    for selector in easy_apply_patterns:
+        element = soup.select_one(selector)
+        if element and "easy apply" in element.get_text(strip=True).lower():
+            return True
+
+    # Fallback: search for "Easy Apply" in common apply button areas
+    apply_sections = soup.select(".top-card-layout__cta-container, .apply-button-container, .jobs-unified-top-card")
+    for section in apply_sections:
+        if "easy apply" in section.get_text(strip=True).lower():
+            return True
+
+    return False
 
 
 def _fallback_parse(soup: BeautifulSoup, source: str) -> tuple[str | None, str | None, str | None, str | None]:
@@ -303,6 +340,11 @@ class JobScraper:
         if not title or not company:
             raise JobScrapeError("Failed to parse job title or company")
 
+        # Detect Easy Apply for LinkedIn jobs
+        is_easy_apply = False
+        if resolved_source == "linkedin":
+            is_easy_apply = _detect_linkedin_easy_apply(soup)
+
         return ScrapedJob(
             title=title,
             company=company,
@@ -311,6 +353,7 @@ class JobScraper:
             source=resolved_source,
             source_id=extract_source_id(url, resolved_source),
             raw_html=html,
+            is_easy_apply=is_easy_apply,
         )
 
     async def scrape(self, url: str, source: str | None = None) -> ScrapedJob:

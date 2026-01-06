@@ -83,6 +83,10 @@ class JobBase(BaseModel):
     priority: int = Field(50, ge=0, le=100)
     notes: str | None = None
     tags: list[str] | None = None
+    is_easy_apply: bool = Field(False, description="LinkedIn Easy Apply job")
+    is_favorite: bool = Field(False, description="User marked as favorite")
+    is_perfect_fit: bool = Field(False, description="User marked as perfect fit")
+    is_ai_forward: bool = Field(False, description="AI-forward company/role")
 
 
 class JobCreate(JobBase):
@@ -118,6 +122,10 @@ class JobUpdate(BaseModel):
     priority: int | None = Field(None, ge=0, le=100)
     notes: str | None = None
     tags: list[str] | None = None
+    is_easy_apply: bool | None = None
+    is_favorite: bool | None = None
+    is_perfect_fit: bool | None = None
+    is_ai_forward: bool | None = None
     closed_reason: str | None = Field(None, max_length=100)
     user_decline_reasons: list[str] | None = None
     company_decline_reasons: list[str] | None = None

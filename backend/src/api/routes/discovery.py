@@ -92,6 +92,7 @@ async def save_discovered_jobs(
                 job_board="linkedin",
                 job_board_id=job_item.linkedin_job_id,
                 status=ModelJobStatus.SAVED,
+                is_easy_apply=job_item.is_easy_apply,
                 notes=_build_notes(job_item),
                 tags=_build_tags(job_item),
             )
@@ -165,10 +166,10 @@ async def get_discovery_stats(
     )
     applied_total = applied_count.scalar() or 0
 
-    # Jobs with easy-apply tag
+    # Jobs with Easy Apply
     easy_apply_count = await db.execute(
         select(func.count(Job.id))
-        .where(Job.tags.contains(["easy-apply"]), Job.deleted_at.is_(None))
+        .where(Job.is_easy_apply == True, Job.deleted_at.is_(None))
     )
     easy_apply_total = easy_apply_count.scalar() or 0
 

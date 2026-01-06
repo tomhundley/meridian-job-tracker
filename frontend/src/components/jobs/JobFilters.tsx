@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, MapPin, TrendingUp, DollarSign, Filter, CircleDot } from "lucide-react";
+import { Search, MapPin, TrendingUp, DollarSign, Filter, CircleDot, Zap, Star, Target, Sparkles } from "lucide-react";
 
 const statuses = [
   { value: "", label: "Any" },
@@ -36,15 +36,51 @@ const salaryRanges = [
   { label: "$250k+", minSalary: 250000 },
 ];
 
+// Easy Apply filter options
+const easyApplyOptions = [
+  { label: "Any", value: "" },
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+];
+
+// Favorite filter options
+const favoriteOptions = [
+  { label: "Any", value: "" },
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+];
+
+// Perfect Fit filter options
+const perfectFitOptions = [
+  { label: "Any", value: "" },
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+];
+
+// AI Forward filter options
+const aiForwardOptions = [
+  { label: "Any", value: "" },
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+];
+
 interface JobFiltersProps {
   search: string;
   status: string;
   workLocationType: string;
+  isEasyApply: string;
+  isFavorite: string;
+  isPerfectFit: string;
+  isAiForward: string;
   minPriority: number;
   minSalary: number;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onWorkLocationTypeChange: (value: string) => void;
+  onIsEasyApplyChange: (value: string) => void;
+  onIsFavoriteChange: (value: string) => void;
+  onIsPerfectFitChange: (value: string) => void;
+  onIsAiForwardChange: (value: string) => void;
   onMinPriorityChange: (value: number) => void;
   onMinSalaryChange: (value: number) => void;
 }
@@ -90,20 +126,32 @@ export function JobFilters({
   search,
   status,
   workLocationType,
+  isEasyApply,
+  isFavorite,
+  isPerfectFit,
+  isAiForward,
   minPriority,
   minSalary,
   onSearchChange,
   onStatusChange,
   onWorkLocationTypeChange,
+  onIsEasyApplyChange,
+  onIsFavoriteChange,
+  onIsPerfectFitChange,
+  onIsAiForwardChange,
   onMinPriorityChange,
   onMinSalaryChange,
 }: JobFiltersProps) {
   // Check if any filters are active
-  const hasActiveFilters = status || workLocationType || minPriority > 0 || minSalary > 0;
+  const hasActiveFilters = status || workLocationType || isEasyApply || isFavorite || isPerfectFit || isAiForward || minPriority > 0 || minSalary > 0;
 
   const clearAllFilters = () => {
     onStatusChange("");
     onWorkLocationTypeChange("");
+    onIsEasyApplyChange("");
+    onIsFavoriteChange("");
+    onIsPerfectFitChange("");
+    onIsAiForwardChange("");
     onMinPriorityChange(0);
     onMinSalaryChange(0);
   };
@@ -152,6 +200,38 @@ export function JobFilters({
           options={locationTypes.map((l) => ({ label: l.label, value: l.value }))}
           value={workLocationType}
           onChange={(v) => onWorkLocationTypeChange(v as string)}
+        />
+
+        <SegmentedControl
+          icon={<Zap size={14} />}
+          label="Easy Apply"
+          options={easyApplyOptions.map((e) => ({ label: e.label, value: e.value }))}
+          value={isEasyApply}
+          onChange={(v) => onIsEasyApplyChange(v as string)}
+        />
+
+        <SegmentedControl
+          icon={<Star size={14} />}
+          label="Favorite"
+          options={favoriteOptions.map((f) => ({ label: f.label, value: f.value }))}
+          value={isFavorite}
+          onChange={(v) => onIsFavoriteChange(v as string)}
+        />
+
+        <SegmentedControl
+          icon={<Target size={14} />}
+          label="Perfect Fit"
+          options={perfectFitOptions.map((p) => ({ label: p.label, value: p.value }))}
+          value={isPerfectFit}
+          onChange={(v) => onIsPerfectFitChange(v as string)}
+        />
+
+        <SegmentedControl
+          icon={<Sparkles size={14} />}
+          label="AI Forward"
+          options={aiForwardOptions.map((a) => ({ label: a.label, value: a.value }))}
+          value={isAiForward}
+          onChange={(v) => onIsAiForwardChange(v as string)}
         />
 
         <SegmentedControl
