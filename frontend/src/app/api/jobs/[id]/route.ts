@@ -11,7 +11,7 @@ async function getAuthToken() {
   return cookieStore.get("auth_token")?.value;
 }
 
-function getAuthHeaders(token: string | undefined) {
+function getAuthHeaders(token: string | undefined): Record<string, string> | null {
   if (token) {
     return { "X-API-Key": token };
   }

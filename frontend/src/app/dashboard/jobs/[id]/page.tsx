@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, ExternalLink, Trash2, FileText, Clock } from "lucide-react";
 import { StatusBadge } from "@/components/jobs/StatusBadge";
+import { DeclineReasonsPicker } from "@/components/jobs/DeclineReasonsPicker";
 import { toast } from "sonner";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -46,6 +47,9 @@ interface Job {
   applied_at: string | null;
   created_at: string;
   updated_at: string;
+  user_decline_reasons: string[] | null;
+  company_decline_reasons: string[] | null;
+  decline_notes: string | null;
 }
 
 interface CoverLetter {
@@ -285,6 +289,54 @@ export default function JobDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Decline Reasons Section - shown when rejected or withdrawn */}
+            {(job.status === "rejected" || job.status === "withdrawn") && (
+              <div className="mt-6 pt-6 border-t border-[var(--color-border-subtle)]">
+                <h3 className="text-base font-semibold mb-4">Decline Details</h3>
+
+                <div className="grid grid-cols-2 gap-6">
+                  {/* User Decline Reasons */}
+                  <div>
+                    <DeclineReasonsPicker
+                      type="user"
+                      selectedReasons={job.user_decline_reasons || []}
+                      onChange={(reasons) =>
+                        handleUpdateJob({ user_decline_reasons: reasons.length > 0 ? reasons : null })
+                      }
+                      disabled={isUpdating}
+                    />
+                  </div>
+
+                  {/* Company Decline Reasons */}
+                  <div>
+                    <DeclineReasonsPicker
+                      type="company"
+                      selectedReasons={job.company_decline_reasons || []}
+                      onChange={(reasons) =>
+                        handleUpdateJob({ company_decline_reasons: reasons.length > 0 ? reasons : null })
+                      }
+                      disabled={isUpdating}
+                    />
+                  </div>
+                </div>
+
+                {/* Decline Notes */}
+                <div className="mt-4">
+                  <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
+                    Additional Notes
+                  </label>
+                  <textarea
+                    value={job.decline_notes || ""}
+                    onChange={(e) => handleUpdateJob({ decline_notes: e.target.value || null })}
+                    disabled={isUpdating}
+                    rows={3}
+                    placeholder="Any additional context about why this didn't work out..."
+                    className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] text-sm"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Job Description */}

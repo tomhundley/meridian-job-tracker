@@ -21,35 +21,30 @@ function getAuthHeaders(token: string | undefined): Record<string, string> | nul
   return null;
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest) {
   const token = await getAuthToken();
   const authHeaders = getAuthHeaders(token);
   if (!authHeaders) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get("type") || "user";
 
   try {
-    const body = await request.json();
-    const response = await fetch(`${BACKEND_URL}/api/v1/jobs/${id}/status`, {
-      method: "PATCH",
-      headers: {
-        ...authHeaders,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    const response = await fetch(
+      `${BACKEND_URL}/api/v1/decline-reasons/${type}`,
+      {
+        headers: authHeaders,
+      }
+    );
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error("Error updating job status:", error);
+    console.error("Error fetching decline reasons:", error);
     return NextResponse.json(
-      { error: "Failed to update job status" },
+      { error: "Failed to fetch decline reasons" },
       { status: 500 }
     );
   }
