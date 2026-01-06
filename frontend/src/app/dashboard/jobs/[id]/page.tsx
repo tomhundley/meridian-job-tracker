@@ -7,6 +7,7 @@ import { useState } from "react";
 import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail, X } from "lucide-react";
 import { StatusBadge } from "@/components/jobs/StatusBadge";
 import { DeclineReasonsPicker } from "@/components/jobs/DeclineReasonsPicker";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { toast } from "sonner";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -89,9 +90,13 @@ export default function JobDetailPage() {
   const { data: contacts } = useSWR<Contact[]>(`/api/jobs/${id}/contacts`, fetcher);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState("");
   const [coverLetters, setCoverLetters] = useState<CoverLetter[]>([]);
+  const [deleteJobModalOpen, setDeleteJobModalOpen] = useState(false);
+  const [deleteContactModalOpen, setDeleteContactModalOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
 
   if (isLoading) {
     return (
@@ -154,9 +159,8 @@ export default function JobDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this job?")) return;
-
+  const handleDeleteJob = async () => {
+    setIsDeleting(true);
     try {
       const response = await fetch(`/api/jobs/${id}`, {
         method: "DELETE",
@@ -170,6 +174,9 @@ export default function JobDetailPage() {
       }
     } catch (error) {
       toast.error("Failed to delete job");
+    } finally {
+      setIsDeleting(false);
+      setDeleteJobModalOpen(false);
     }
   };
 
@@ -201,9 +208,12 @@ export default function JobDetailPage() {
     setEditingNotes(false);
   };
 
-  const handleDeleteContact = async (contactId: string) => {
+  const handleDeleteContact = async () => {
+    if (!contactToDelete) return;
+
+    setIsDeleting(true);
     try {
-      const response = await fetch(`/api/jobs/${id}/contacts/${contactId}`, {
+      const response = await fetch(`/api/jobs/${id}/contacts/${contactToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -216,7 +226,16 @@ export default function JobDetailPage() {
       }
     } catch (error) {
       toast.error("Failed to delete contact");
+    } finally {
+      setIsDeleting(false);
+      setDeleteContactModalOpen(false);
+      setContactToDelete(null);
     }
+  };
+
+  const openDeleteContactModal = (contact: Contact) => {
+    setContactToDelete(contact);
+    setDeleteContactModalOpen(true);
   };
 
   return (
@@ -249,8 +268,9 @@ export default function JobDetailPage() {
             </a>
           )}
           <button
-            onClick={handleDelete}
+            onClick={() => setDeleteJobModalOpen(true)}
             className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+            title="Delete job"
           >
             <Trash2 size={20} />
           </button>
@@ -518,7 +538,7 @@ export default function JobDetailPage() {
                           </a>
                         )}
                         <button
-                          onClick={() => handleDeleteContact(contact.id)}
+                          onClick={() => openDeleteContactModal(contact)}
                           className="p-1.5 hover:bg-red-500/10 rounded transition-colors"
                           title="Delete contact"
                         >
@@ -623,6 +643,33 @@ export default function JobDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Job Modal */}
+      <ConfirmModal
+        isOpen={deleteJobModalOpen}
+        onClose={() => setDeleteJobModalOpen(false)}
+        onConfirm={handleDeleteJob}
+        title="Delete Job"
+        message={`Are you sure you want to delete "${job.title}" at ${job.company}? This action cannot be undone.`}
+        confirmLabel="Delete Job"
+        variant="danger"
+        isLoading={isDeleting}
+      />
+
+      {/* Delete Contact Modal */}
+      <ConfirmModal
+        isOpen={deleteContactModalOpen}
+        onClose={() => {
+          setDeleteContactModalOpen(false);
+          setContactToDelete(null);
+        }}
+        onConfirm={handleDeleteContact}
+        title="Delete Contact"
+        message={contactToDelete ? `Are you sure you want to remove "${contactToDelete.name}" from this job?` : ""}
+        confirmLabel="Delete Contact"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }
