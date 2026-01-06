@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, case, nulls_last
 from sqlalchemy.orm import selectinload
 
 from src.api.deps import DbSession, require_permissions
@@ -51,6 +51,8 @@ async def list_jobs(
     min_salary: Annotated[int | None, Query(ge=0, description="Minimum salary filter")] = None,
     max_salary: Annotated[int | None, Query(ge=0, description="Maximum salary filter")] = None,
     search: str | None = None,
+    sort_by: Annotated[str | None, Query(description="Sort field: updated_at, created_at, priority, salary")] = "updated_at",
+    sort_order: Annotated[str | None, Query(description="Sort order: asc or desc")] = "desc",
 ) -> JobListResponse:
     """List all jobs with optional filters and pagination."""
     # Base query - exclude deleted
@@ -90,9 +92,35 @@ async def list_jobs(
     count_query = select(func.count()).select_from(query.subquery())
     total = await db.scalar(count_query) or 0
 
+    # Determine sort column
+    # For salary, use COALESCE to pick best available value, with nulls always last
+    salary_sort_col = func.coalesce(Job.salary_max, Job.salary_min)
+
+    sort_column_map = {
+        "updated_at": Job.updated_at,
+        "created_at": Job.created_at,
+        "priority": Job.priority,
+        "salary": salary_sort_col,
+        "title": Job.title,
+        "company": Job.company,
+    }
+    sort_column = sort_column_map.get(sort_by or "updated_at", Job.updated_at)
+
+    # Apply sort order, with nulls last for salary
+    if sort_order == "asc":
+        if sort_by == "salary":
+            order_clause = nulls_last(sort_column.asc())
+        else:
+            order_clause = sort_column.asc()
+    else:
+        if sort_by == "salary":
+            order_clause = nulls_last(sort_column.desc())
+        else:
+            order_clause = sort_column.desc()
+
     # Apply pagination and ordering
     query = (
-        query.order_by(Job.priority.desc(), Job.created_at.desc())
+        query.order_by(order_clause, Job.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     )

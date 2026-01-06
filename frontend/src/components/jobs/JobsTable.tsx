@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -15,12 +16,16 @@ interface Job {
   status: string;
   priority: number;
   created_at: string;
+  updated_at: string;
   applied_at: string | null;
   salary_min: number | null;
   salary_max: number | null;
   salary_currency: string | null;
   employment_type: string | null;
 }
+
+export type SortField = "updated_at" | "created_at" | "priority" | "salary" | "title" | "company";
+export type SortOrder = "asc" | "desc";
 
 interface JobsTableProps {
   search?: string;
@@ -29,6 +34,9 @@ interface JobsTableProps {
   minPriority?: number;
   minSalary?: number;
   maxSalary?: number;
+  sortBy?: SortField;
+  sortOrder?: SortOrder;
+  onSortChange?: (field: SortField, order: SortOrder) => void;
 }
 
 function formatSalary(min: number | null, max: number | null, currency: string | null): string {
@@ -60,7 +68,25 @@ const locationTypeLabels: Record<string, string> = {
   on_site: "On-site",
 };
 
-export function JobsTable({ search, status, workLocationType, minPriority, minSalary, maxSalary }: JobsTableProps) {
+function getPriorityLabel(priority: number): { label: string; color: string } {
+  if (priority >= 81) return { label: "Top", color: "text-emerald-400" };
+  if (priority >= 61) return { label: "High", color: "text-blue-400" };
+  if (priority >= 41) return { label: "Med", color: "text-[var(--color-text-secondary)]" };
+  if (priority >= 1) return { label: "Low", color: "text-[var(--color-text-tertiary)]" };
+  return { label: "-", color: "text-[var(--color-text-tertiary)]" };
+}
+
+export function JobsTable({
+  search,
+  status,
+  workLocationType,
+  minPriority,
+  minSalary,
+  maxSalary,
+  sortBy = "updated_at",
+  sortOrder = "desc",
+  onSortChange,
+}: JobsTableProps) {
   // Build query string
   const params = new URLSearchParams();
   if (search) params.append("search", search);
@@ -69,8 +95,26 @@ export function JobsTable({ search, status, workLocationType, minPriority, minSa
   if (minPriority) params.append("min_priority", minPriority.toString());
   if (minSalary) params.append("min_salary", minSalary.toString());
   if (maxSalary) params.append("max_salary", maxSalary.toString());
+  params.append("sort_by", sortBy);
+  params.append("sort_order", sortOrder);
   const queryString = params.toString();
   const url = `/api/jobs${queryString ? `?${queryString}` : ""}`;
+
+  const handleSort = (field: SortField) => {
+    if (!onSortChange) return;
+    // If clicking the same field, toggle order; otherwise, default to desc
+    const newOrder = sortBy === field && sortOrder === "desc" ? "asc" : "desc";
+    onSortChange(field, newOrder);
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortBy !== field) {
+      return <ChevronsUpDown size={14} className="opacity-30" />;
+    }
+    return sortOrder === "desc"
+      ? <ChevronDown size={14} className="text-[var(--color-accent)]" />
+      : <ChevronUp size={14} className="text-[var(--color-accent)]" />;
+  };
 
   const { data, error, isLoading } = useSWR(url, fetcher);
 
@@ -113,11 +157,23 @@ export function JobsTable({ search, status, workLocationType, minPriority, minSa
       <table className="w-full">
         <thead>
           <tr className="border-b border-[var(--color-border-subtle)]">
-            <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
-              Title
+            <th
+              className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
+              onClick={() => handleSort("title")}
+            >
+              <div className="flex items-center gap-1">
+                Title
+                <SortIcon field="title" />
+              </div>
             </th>
-            <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
-              Company
+            <th
+              className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
+              onClick={() => handleSort("company")}
+            >
+              <div className="flex items-center gap-1">
+                Company
+                <SortIcon field="company" />
+              </div>
             </th>
             <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
               Location
@@ -125,17 +181,44 @@ export function JobsTable({ search, status, workLocationType, minPriority, minSa
             <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
               Type
             </th>
-            <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
-              Salary
+            <th
+              className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
+              onClick={() => handleSort("salary")}
+            >
+              <div className="flex items-center gap-1">
+                Salary
+                <SortIcon field="salary" />
+              </div>
             </th>
             <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
               Status
             </th>
-            <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
-              Priority
+            <th
+              className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
+              onClick={() => handleSort("priority")}
+            >
+              <div className="flex items-center gap-1">
+                Priority
+                <SortIcon field="priority" />
+              </div>
             </th>
-            <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
-              Added
+            <th
+              className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
+              onClick={() => handleSort("created_at")}
+            >
+              <div className="flex items-center gap-1">
+                Added
+                <SortIcon field="created_at" />
+              </div>
+            </th>
+            <th
+              className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
+              onClick={() => handleSort("updated_at")}
+            >
+              <div className="flex items-center gap-1">
+                Modified
+                <SortIcon field="updated_at" />
+              </div>
             </th>
           </tr>
         </thead>
@@ -175,23 +258,20 @@ export function JobsTable({ search, status, workLocationType, minPriority, minSa
                 <StatusBadge status={job.status} />
               </td>
               <td className="px-4 py-3">
-                <div className="flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <span
-                      key={i}
-                      className={
-                        i < Math.ceil(job.priority / 20)
-                          ? "text-yellow-400"
-                          : "text-[var(--color-text-tertiary)]"
-                      }
-                    >
-                      ★
+                {(() => {
+                  const { label, color } = getPriorityLabel(job.priority);
+                  return (
+                    <span className={`text-sm font-medium ${color}`}>
+                      {label}
                     </span>
-                  ))}
-                </div>
+                  );
+                })()}
               </td>
               <td className="px-4 py-3 text-[var(--color-text-tertiary)] text-sm">
                 {new Date(job.created_at).toLocaleDateString()}
+              </td>
+              <td className="px-4 py-3 text-[var(--color-text-tertiary)] text-sm">
+                {new Date(job.updated_at).toLocaleDateString()}
               </td>
             </tr>
           ))}

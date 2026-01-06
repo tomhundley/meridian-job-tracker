@@ -286,3 +286,84 @@ async def test_update_job_work_location_type(client, api_key_header):
     assert update_response.status_code == 200
     data = update_response.json()
     assert data["work_location_type"] == "hybrid"
+
+
+@pytest.mark.asyncio
+async def test_list_jobs_sort_by_updated_at(client, api_key_header):
+    """Test sorting jobs by updated_at."""
+    # Create jobs
+    for i in range(3):
+        response = await client.post(
+            "/api/v1/jobs",
+            json={"title": f"Job {i}", "company": "TestCo"},
+            headers=api_key_header,
+        )
+        assert response.status_code == 201
+
+    # Get jobs sorted by updated_at desc (default)
+    response = await client.get(
+        "/api/v1/jobs?sort_by=updated_at&sort_order=desc",
+        headers=api_key_header,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 3
+
+    # Get jobs sorted by updated_at asc
+    response = await client.get(
+        "/api/v1/jobs?sort_by=updated_at&sort_order=asc",
+        headers=api_key_header,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_list_jobs_sort_by_priority(client, api_key_header):
+    """Test sorting jobs by priority."""
+    # Create jobs with different priorities
+    jobs = [
+        {"title": "Low Priority", "company": "Co1", "priority": 10},
+        {"title": "High Priority", "company": "Co2", "priority": 90},
+        {"title": "Med Priority", "company": "Co3", "priority": 50},
+    ]
+    for job in jobs:
+        response = await client.post("/api/v1/jobs", json=job, headers=api_key_header)
+        assert response.status_code == 201
+
+    # Get jobs sorted by priority desc
+    response = await client.get(
+        "/api/v1/jobs?sort_by=priority&sort_order=desc",
+        headers=api_key_header,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    titles = [job["title"] for job in data["items"]]
+    # First job should be high priority
+    assert titles[0] == "High Priority"
+
+
+@pytest.mark.asyncio
+async def test_list_jobs_sort_by_salary(client, api_key_header):
+    """Test sorting jobs by salary."""
+    # Create jobs with different salaries
+    jobs = [
+        {"title": "Low Pay", "company": "Co1", "salary_max": 50000},
+        {"title": "High Pay", "company": "Co2", "salary_max": 200000},
+        {"title": "Mid Pay", "company": "Co3", "salary_max": 100000},
+    ]
+    for job in jobs:
+        response = await client.post("/api/v1/jobs", json=job, headers=api_key_header)
+        assert response.status_code == 201
+
+    # Get jobs sorted by salary desc
+    response = await client.get(
+        "/api/v1/jobs?sort_by=salary&sort_order=desc",
+        headers=api_key_header,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    titles = [job["title"] for job in data["items"]]
+    # First job should be highest pay
+    assert titles[0] == "High Pay"

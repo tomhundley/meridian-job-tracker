@@ -1,40 +1,39 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, MapPin, TrendingUp, DollarSign, Filter, CircleDot } from "lucide-react";
 
 const statuses = [
-  { value: "", label: "All Statuses" },
+  { value: "", label: "Any" },
   { value: "saved", label: "Saved" },
   { value: "applied", label: "Applied" },
-  { value: "interviewing", label: "Interviewing" },
+  { value: "interviewing", label: "Interview" },
   { value: "offer", label: "Offer" },
   { value: "rejected", label: "Rejected" },
 ];
 
 const locationTypes = [
-  { value: "", label: "All" },
+  { value: "", label: "Any" },
   { value: "remote", label: "Remote" },
   { value: "hybrid", label: "Hybrid" },
   { value: "on_site", label: "On-site" },
 ];
 
-// Priority levels: 0 = All, 1-5 = minimum stars
+// Priority levels with meaningful labels
 const priorityLevels = [
-  { value: 0, label: "All", minPriority: 0 },
-  { value: 1, label: "1+", minPriority: 1 },
-  { value: 2, label: "2+", minPriority: 21 },
-  { value: 3, label: "3+", minPriority: 41 },
-  { value: 4, label: "4+", minPriority: 61 },
-  { value: 5, label: "5", minPriority: 81 },
+  { label: "Any", minPriority: 0 },
+  { label: "Low+", minPriority: 1 },
+  { label: "Med+", minPriority: 41 },
+  { label: "High+", minPriority: 61 },
+  { label: "Top", minPriority: 81 },
 ];
 
-// Salary range presets (in thousands)
+// Salary range presets
 const salaryRanges = [
-  { label: "All", minSalary: 0, maxSalary: 0 },
-  { label: "$100k+", minSalary: 100000, maxSalary: 0 },
-  { label: "$150k+", minSalary: 150000, maxSalary: 0 },
-  { label: "$200k+", minSalary: 200000, maxSalary: 0 },
-  { label: "$250k+", minSalary: 250000, maxSalary: 0 },
+  { label: "Any", minSalary: 0 },
+  { label: "$100k+", minSalary: 100000 },
+  { label: "$150k+", minSalary: 150000 },
+  { label: "$200k+", minSalary: 200000 },
+  { label: "$250k+", minSalary: 250000 },
 ];
 
 interface JobFiltersProps {
@@ -50,6 +49,43 @@ interface JobFiltersProps {
   onMinSalaryChange: (value: number) => void;
 }
 
+interface SegmentedControlProps {
+  icon?: React.ReactNode;
+  label: string;
+  options: { label: string; value: string | number }[];
+  value: string | number;
+  onChange: (value: string | number) => void;
+}
+
+function SegmentedControl({ icon, label, options, value, onChange }: SegmentedControlProps) {
+  return (
+    <div
+      className="flex items-center gap-2.5 px-3 py-2 rounded-lg backdrop-blur-sm border border-white/10"
+      style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}
+    >
+      {icon && <span className="text-[var(--color-text-tertiary)]">{icon}</span>}
+      <span className="text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wide">
+        {label}
+      </span>
+      <div className="flex bg-[var(--color-bg-tertiary)] rounded-md p-0.5">
+        {options.map((option) => (
+          <button
+            key={option.label}
+            onClick={() => onChange(option.value)}
+            className={`px-3 py-1 text-sm font-medium rounded transition-all ${
+              value === option.value
+                ? "bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm"
+                : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function JobFilters({
   search,
   status,
@@ -62,99 +98,77 @@ export function JobFilters({
   onMinPriorityChange,
   onMinSalaryChange,
 }: JobFiltersProps) {
-  // Find current priority level from minPriority value
-  const currentPriorityLevel = priorityLevels.find(
-    (p) => p.minPriority === minPriority
-  )?.value ?? 0;
+  // Check if any filters are active
+  const hasActiveFilters = status || workLocationType || minPriority > 0 || minSalary > 0;
+
+  const clearAllFilters = () => {
+    onStatusChange("");
+    onWorkLocationTypeChange("");
+    onMinPriorityChange(0);
+    onMinSalaryChange(0);
+  };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-3">
+      {/* Search Row */}
       <div className="flex gap-4 items-center">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 max-w-xl">
           <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)]"
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)]"
             size={18}
           />
           <input
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search jobs..."
-            className="w-full pl-10 pr-4 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border-subtle)] rounded-lg text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+            placeholder="Search by title, company, or description..."
+            className="w-full pl-11 pr-4 py-2.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border-subtle)] rounded-lg text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 focus:border-[var(--color-accent)]/50 transition-all"
           />
         </div>
 
-        <select
-          value={status}
-          onChange={(e) => onStatusChange(e.target.value)}
-          className="px-4 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border-subtle)] rounded-lg text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-        >
-          {statuses.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+        {hasActiveFilters && (
+          <button
+            onClick={clearAllFilters}
+            className="px-4 py-2.5 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] rounded-lg transition-all"
+          >
+            Clear all
+          </button>
+        )}
       </div>
 
-      <div className="flex gap-6 items-center flex-wrap">
-        <div className="flex gap-2 items-center">
-          <span className="text-sm text-[var(--color-text-tertiary)]">Location:</span>
-          {locationTypes.map((loc) => (
-            <button
-              key={loc.value}
-              onClick={() => onWorkLocationTypeChange(loc.value)}
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
-                workLocationType === loc.value
-                  ? "bg-[var(--color-accent)] text-white"
-                  : "bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]"
-              }`}
-            >
-              {loc.label}
-            </button>
-          ))}
-        </div>
+      {/* Filter Controls Row */}
+      <div className="flex items-center gap-3 flex-wrap pt-3 border-t border-[var(--color-border-subtle)]">
+        <SegmentedControl
+          icon={<CircleDot size={14} />}
+          label="Status"
+          options={statuses.map((s) => ({ label: s.label, value: s.value }))}
+          value={status}
+          onChange={(v) => onStatusChange(v as string)}
+        />
 
-        <div className="flex gap-2 items-center">
-          <span className="text-sm text-[var(--color-text-tertiary)]">Priority:</span>
-          {priorityLevels.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => onMinPriorityChange(p.minPriority)}
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors flex items-center gap-1 ${
-                currentPriorityLevel === p.value
-                  ? "bg-[var(--color-accent)] text-white"
-                  : "bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]"
-              }`}
-            >
-              {p.value === 0 ? (
-                "All"
-              ) : (
-                <>
-                  <span className="text-yellow-400">{"★".repeat(p.value)}</span>
-                  {p.value < 5 && <span className="text-xs">+</span>}
-                </>
-              )}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          icon={<MapPin size={14} />}
+          label="Location"
+          options={locationTypes.map((l) => ({ label: l.label, value: l.value }))}
+          value={workLocationType}
+          onChange={(v) => onWorkLocationTypeChange(v as string)}
+        />
 
-        <div className="flex gap-2 items-center">
-          <span className="text-sm text-[var(--color-text-tertiary)]">Salary:</span>
-          {salaryRanges.map((s) => (
-            <button
-              key={s.label}
-              onClick={() => onMinSalaryChange(s.minSalary)}
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
-                minSalary === s.minSalary
-                  ? "bg-[var(--color-accent)] text-white"
-                  : "bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          icon={<TrendingUp size={14} />}
+          label="Priority"
+          options={priorityLevels.map((p) => ({ label: p.label, value: p.minPriority }))}
+          value={minPriority}
+          onChange={(v) => onMinPriorityChange(v as number)}
+        />
+
+        <SegmentedControl
+          icon={<DollarSign size={14} />}
+          label="Salary"
+          options={salaryRanges.map((s) => ({ label: s.label, value: s.minSalary }))}
+          value={minSalary}
+          onChange={(v) => onMinSalaryChange(v as number)}
+        />
       </div>
     </div>
   );
