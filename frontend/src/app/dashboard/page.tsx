@@ -1,8 +1,16 @@
+"use client";
+
+import { useState } from "react";
 import { JobsTable } from "@/components/jobs/JobsTable";
 import { JobFilters } from "@/components/jobs/JobFilters";
 import { StatsCards } from "@/components/jobs/StatsCards";
 
 export default function DashboardPage() {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [workLocationType, setWorkLocationType] = useState("");
+  const [minPriority, setMinPriority] = useState(0);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -16,8 +24,22 @@ export default function DashboardPage() {
       </div>
 
       <StatsCards />
-      <JobFilters />
-      <JobsTable />
+      <JobFilters
+        search={search}
+        status={status}
+        workLocationType={workLocationType}
+        minPriority={minPriority}
+        onSearchChange={setSearch}
+        onStatusChange={setStatus}
+        onWorkLocationTypeChange={setWorkLocationType}
+        onMinPriorityChange={setMinPriority}
+      />
+      <JobsTable
+        search={search}
+        status={status}
+        workLocationType={workLocationType}
+        minPriority={minPriority}
+      />
     </div>
   );
 }

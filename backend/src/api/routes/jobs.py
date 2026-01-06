@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from src.api.deps import DbSession, require_permissions
-from src.models import Job, CoverLetter, JobStatus as ModelJobStatus, RoleType as ModelRoleType
+from src.models import Job, CoverLetter, JobStatus as ModelJobStatus, RoleType as ModelRoleType, WorkLocationType as ModelWorkLocationType
 from src.schemas import (
     JobCreate,
     JobIngestRequest,
@@ -23,6 +23,7 @@ from src.schemas import (
     JobUpdate,
     JobStatus,
     RoleType,
+    WorkLocationType,
     CoverLetterCreate,
     CoverLetterResponse,
 )
@@ -45,6 +46,8 @@ async def list_jobs(
     status: JobStatus | None = None,
     company: str | None = None,
     target_role: RoleType | None = None,
+    work_location_type: WorkLocationType | None = None,
+    min_priority: Annotated[int | None, Query(ge=0, le=100)] = None,
     search: str | None = None,
 ) -> JobListResponse:
     """List all jobs with optional filters and pagination."""
@@ -58,6 +61,10 @@ async def list_jobs(
         query = query.where(Job.company.ilike(f"%{company}%"))
     if target_role:
         query = query.where(Job.target_role == ModelRoleType(target_role.value))
+    if work_location_type:
+        query = query.where(Job.work_location_type == ModelWorkLocationType(work_location_type.value))
+    if min_priority is not None:
+        query = query.where(Job.priority >= min_priority)
     if search:
         # Simple search on title, company, description
         search_filter = (

@@ -44,12 +44,21 @@ class ApplicationMethod(str, Enum):
     MANUAL = "manual"
 
 
+class WorkLocationType(str, Enum):
+    """Work location type."""
+
+    REMOTE = "remote"
+    HYBRID = "hybrid"
+    ON_SITE = "on_site"
+
+
 class JobBase(BaseModel):
     """Base schema for Job."""
 
     title: str = Field(..., min_length=1, max_length=255)
     company: str = Field(..., min_length=1, max_length=255)
     location: str | None = Field(None, max_length=255)
+    work_location_type: WorkLocationType | None = None
     url: str | None = None
     description_raw: str | None = None
     target_role: RoleType | None = None
@@ -79,6 +88,7 @@ class JobUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=255)
     company: str | None = Field(None, min_length=1, max_length=255)
     location: str | None = Field(None, max_length=255)
+    work_location_type: WorkLocationType | None = None
     url: str | None = None
     description_raw: str | None = None
     target_role: RoleType | None = None

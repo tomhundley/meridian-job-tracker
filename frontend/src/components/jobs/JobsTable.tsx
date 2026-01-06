@@ -11,14 +11,37 @@ interface Job {
   title: string;
   company: string;
   location: string | null;
+  work_location_type: string | null;
   status: string;
   priority: number;
   created_at: string;
   applied_at: string | null;
 }
 
-export function JobsTable() {
-  const { data, error, isLoading } = useSWR("/api/jobs", fetcher);
+interface JobsTableProps {
+  search?: string;
+  status?: string;
+  workLocationType?: string;
+  minPriority?: number;
+}
+
+const locationTypeLabels: Record<string, string> = {
+  remote: "Remote",
+  hybrid: "Hybrid",
+  on_site: "On-site",
+};
+
+export function JobsTable({ search, status, workLocationType, minPriority }: JobsTableProps) {
+  // Build query string
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  if (status) params.append("status", status);
+  if (workLocationType) params.append("work_location_type", workLocationType);
+  if (minPriority) params.append("min_priority", minPriority.toString());
+  const queryString = params.toString();
+  const url = `/api/jobs${queryString ? `?${queryString}` : ""}`;
+
+  const { data, error, isLoading } = useSWR(url, fetcher);
 
   if (isLoading) {
     return (
@@ -69,6 +92,9 @@ export function JobsTable() {
               Location
             </th>
             <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
+              Type
+            </th>
+            <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
               Status
             </th>
             <th className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
@@ -98,6 +124,15 @@ export function JobsTable() {
               </td>
               <td className="px-4 py-3 text-[var(--color-text-secondary)]">
                 {job.location || "-"}
+              </td>
+              <td className="px-4 py-3">
+                {job.work_location_type ? (
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-[var(--color-bg-elevated)] text-[var(--color-text-secondary)]">
+                    {locationTypeLabels[job.work_location_type] || job.work_location_type}
+                  </span>
+                ) : (
+                  <span className="text-[var(--color-text-tertiary)]">-</span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <StatusBadge status={job.status} />

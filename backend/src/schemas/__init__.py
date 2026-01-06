@@ -14,6 +14,7 @@ from .job import (
     JobStatus,
     RoleType,
     ApplicationMethod,
+    WorkLocationType,
 )
 from .cover_letter import (
     CoverLetterCreate,
@@ -39,6 +40,12 @@ from .decline_reason import (
     DeclineReasonsListResponse,
     DeclineUpdate,
 )
+from .job_contact import (
+    JobContactCreate,
+    JobContactUpdate,
+    JobContactResponse,
+    ContactType,
+)
 
 __all__ = [
     # Job schemas
@@ -55,6 +62,7 @@ __all__ = [
     "JobStatus",
     "RoleType",
     "ApplicationMethod",
+    "WorkLocationType",
     # Cover letter schemas
     "CoverLetterCreate",
     "CoverLetterResponse",
@@ -79,4 +87,9 @@ __all__ = [
     "CategoryWithReasons",
     "DeclineReasonsListResponse",
     "DeclineUpdate",
+    # Job contact schemas
+    "JobContactCreate",
+    "JobContactUpdate",
+    "JobContactResponse",
+    "ContactType",
 ]

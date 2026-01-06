@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from .application_attempt import ApplicationAttempt
     from .cover_letter import CoverLetter
     from .email import Email
+    from .job_contact import JobContact
 
 
 class JobStatus(str, enum.Enum):
@@ -62,6 +63,14 @@ class ApplicationMethod(str, enum.Enum):
     MANUAL = "manual"
 
 
+class WorkLocationType(str, enum.Enum):
+    """Work location type for the job."""
+
+    REMOTE = "remote"
+    HYBRID = "hybrid"
+    ON_SITE = "on_site"
+
+
 class Job(Base):
     """Job posting being tracked for applications."""
 
@@ -96,6 +105,9 @@ class Job(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     company: Mapped[str] = mapped_column(String(255), nullable=False)
     location: Mapped[str | None] = mapped_column(String(255))
+    work_location_type: Mapped[WorkLocationType | None] = mapped_column(
+        Enum(WorkLocationType, name="work_location_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
+    )
     url: Mapped[str | None] = mapped_column(Text)
     job_board: Mapped[str | None] = mapped_column(String(50))
     job_board_id: Mapped[str | None] = mapped_column(String(255))
@@ -153,6 +165,11 @@ class Job(Base):
     )
     application_attempts: Mapped[list["ApplicationAttempt"]] = relationship(
         "ApplicationAttempt",
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+    contacts: Mapped[list["JobContact"]] = relationship(
+        "JobContact",
         back_populates="job",
         cascade="all, delete-orphan",
     )

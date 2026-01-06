@@ -10,6 +10,7 @@ from .webhooks import router as webhooks_router
 from .health import router as health_router
 from .discovery import router as discovery_router
 from .decline_reasons import router as decline_reasons_router
+from .job_contacts import router as job_contacts_router
 
 api_router = APIRouter()
 
@@ -21,3 +22,4 @@ api_router.include_router(agents_router, prefix="/agents", tags=["agents"])
 api_router.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 api_router.include_router(discovery_router)
 api_router.include_router(decline_reasons_router, prefix="/decline-reasons", tags=["decline-reasons"])
+api_router.include_router(job_contacts_router, prefix="/jobs/{job_id}/contacts", tags=["job-contacts"])

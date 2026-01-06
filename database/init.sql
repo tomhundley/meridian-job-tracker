@@ -158,6 +158,33 @@ CREATE TABLE application_attempts (
     confirmed_by VARCHAR(100)
 );
 
+-- Job contacts table (hiring team from LinkedIn)
+CREATE TABLE job_contacts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Contact info
+    name VARCHAR(255) NOT NULL,
+    title VARCHAR(255),
+    linkedin_url TEXT,
+    linkedin_member_id VARCHAR(100),
+    email VARCHAR(255),
+
+    -- Role on this job
+    contact_type VARCHAR(50) NOT NULL DEFAULT 'recruiter',
+    is_job_poster BOOLEAN NOT NULL DEFAULT false,
+
+    -- Tracking
+    notes TEXT,
+    contacted_at TIMESTAMPTZ,
+    response_received_at TIMESTAMPTZ,
+
+    -- Unique constraint: one contact entry per person per job
+    UNIQUE(job_id, linkedin_url)
+);
+
 -- Agents table (API keys with permissions)
 CREATE TABLE agents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -282,6 +309,11 @@ CREATE INDEX idx_emails_timestamp ON emails(email_timestamp DESC);
 CREATE INDEX idx_application_attempts_job_id ON application_attempts(job_id);
 CREATE INDEX idx_application_attempts_pending ON application_attempts(job_id) WHERE requires_confirmation = true AND confirmed_at IS NULL;
 
+CREATE INDEX idx_job_contacts_job_id ON job_contacts(job_id);
+CREATE INDEX idx_job_contacts_linkedin_url ON job_contacts(linkedin_url);
+CREATE INDEX idx_job_contacts_type ON job_contacts(contact_type);
+CREATE INDEX idx_job_contacts_contacted ON job_contacts(contacted_at) WHERE contacted_at IS NOT NULL;
+
 CREATE INDEX idx_agents_api_key ON agents(api_key);
 CREATE INDEX idx_webhooks_active ON webhooks(is_active) WHERE is_active = true;
 
@@ -329,6 +361,11 @@ CREATE TRIGGER update_webhooks_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_job_contacts_updated_at
+    BEFORE UPDATE ON job_contacts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Trigger to update status_changed_at when status changes
 CREATE OR REPLACE FUNCTION update_status_changed_at()
 RETURNS TRIGGER AS $$
@@ -350,6 +387,7 @@ COMMENT ON TABLE jobs IS 'Job postings being tracked for applications';
 COMMENT ON TABLE cover_letters IS 'Generated cover letters for job applications';
 COMMENT ON TABLE emails IS 'Email correspondence related to job applications';
 COMMENT ON TABLE application_attempts IS 'Automation attempts for job applications';
+COMMENT ON TABLE job_contacts IS 'Hiring team contacts from LinkedIn job postings';
 
 COMMENT ON COLUMN jobs.priority IS '0-100 scale, higher = more important';
 COMMENT ON COLUMN jobs.status IS 'Current status in the application pipeline';
@@ -358,6 +396,11 @@ COMMENT ON COLUMN jobs.company_decline_reasons IS 'Array of reason codes when co
 COMMENT ON COLUMN jobs.decline_notes IS 'Additional notes about the decline';
 COMMENT ON COLUMN cover_letters.is_current IS 'Whether this is the current version for the job';
 COMMENT ON COLUMN application_attempts.requires_confirmation IS 'Whether human confirmation is needed before submitting';
+
+COMMENT ON COLUMN job_contacts.contact_type IS 'Type of contact: recruiter, hiring_manager, team_member, job_poster, hr_contact';
+COMMENT ON COLUMN job_contacts.is_job_poster IS 'Whether this person posted the job listing';
+COMMENT ON COLUMN job_contacts.contacted_at IS 'When outreach was made to this contact';
+COMMENT ON COLUMN job_contacts.response_received_at IS 'When a response was received from this contact';
 
 COMMENT ON TABLE user_decline_reasons IS 'Lookup table for reasons user passes on a job';
 COMMENT ON TABLE company_decline_reasons IS 'Lookup table for reasons company rejects user';
