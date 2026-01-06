@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { ChevronUp, ChevronDown, ChevronsUpDown, User, Zap, Target, Sparkles } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, User, Zap, Target, Sparkles, Heart } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -222,6 +222,9 @@ export function JobsTable({
             <th className="w-8 px-1 py-3" title="AI Forward">
               <Sparkles size={14} className="text-[var(--color-text-tertiary)] opacity-40" />
             </th>
+            <th className="w-8 px-1 py-3" title="Favorite">
+              <Heart size={14} className="text-[var(--color-text-tertiary)] opacity-40" />
+            </th>
             <th className="text-left px-3 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
               Age
             </th>
@@ -288,19 +291,12 @@ export function JobsTable({
               className="border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-elevated)] transition-colors"
             >
               <td className="px-4 py-3">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <Link
-                    href={`/dashboard/jobs/${job.id}`}
-                    className="font-medium hover:text-[var(--color-accent)] transition-colors"
-                  >
-                    {job.title}
-                  </Link>
-                  {job.is_favorite && (
-                    <span className="text-yellow-400" title="Favorite">
-                      ★
-                    </span>
-                  )}
-                </div>
+                <Link
+                  href={`/dashboard/jobs/${job.id}`}
+                  className="font-medium hover:text-[var(--color-accent)] transition-colors"
+                >
+                  {job.title}
+                </Link>
               </td>
               <td className="px-1 py-3 text-center">
                 {job.contact_count > 0 && (
@@ -322,6 +318,11 @@ export function JobsTable({
               <td className="px-1 py-3 text-center">
                 {job.is_ai_forward && (
                   <Sparkles size={14} className="text-cyan-400" />
+                )}
+              </td>
+              <td className="px-1 py-3 text-center">
+                {job.is_favorite && (
+                  <Heart size={14} className="text-red-400 fill-red-400" />
                 )}
               </td>
               <td className="px-3 py-3 text-sm">

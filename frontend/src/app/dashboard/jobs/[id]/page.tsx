@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail, X, Heart } from "lucide-react";
 import { StatusBadge } from "@/components/jobs/StatusBadge";
 import { DeclineReasonsPicker } from "@/components/jobs/DeclineReasonsPicker";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -266,8 +266,8 @@ export default function JobDetailPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold">{job.title}</h1>
               {job.is_favorite && (
-                <span className="px-2 py-1 text-xs font-medium rounded bg-yellow-500/20 text-yellow-400">
-                  ★ Favorite
+                <span className="px-2 py-1 text-xs font-medium rounded bg-red-500/20 text-red-400 flex items-center gap-1">
+                  <Heart size={12} className="fill-red-400" /> Favorite
                 </span>
               )}
               {job.is_perfect_fit && (
@@ -394,9 +394,12 @@ export default function JobDetailPage() {
                     checked={job.is_favorite}
                     onChange={(e) => handleUpdateJob({ is_favorite: e.target.checked })}
                     disabled={isUpdating}
-                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-yellow-500 focus:ring-yellow-500"
+                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-red-500 focus:ring-red-500"
                   />
-                  <span className="text-sm">★ Favorite</span>
+                  <span className="text-sm flex items-center gap-1">
+                    <Heart size={14} className={job.is_favorite ? "text-red-400 fill-red-400" : "text-[var(--color-text-tertiary)]"} />
+                    Favorite
+                  </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
