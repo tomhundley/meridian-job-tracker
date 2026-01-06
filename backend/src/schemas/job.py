@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
+from src.schemas.job_contact import JobContactResponse
+
 
 class JobStatus(str, Enum):
     """Job application status."""
@@ -159,7 +161,8 @@ class JobResponse(JobBase):
     user_decline_reasons: list[str] | None = None
     company_decline_reasons: list[str] | None = None
     decline_notes: str | None = None
-    contact_count: int = 0  # Number of contacts associated with this job
+    contacts: list[JobContactResponse] = []
+    contact_count: int = 0
 
 
 class JobBulkIngestRequest(BaseModel):
