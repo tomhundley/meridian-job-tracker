@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ExternalLink, Trash2, FileText, Clock } from "lucide-react";
+import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail } from "lucide-react";
 import { StatusBadge } from "@/components/jobs/StatusBadge";
 import { DeclineReasonsPicker } from "@/components/jobs/DeclineReasonsPicker";
 import { toast } from "sonner";
@@ -60,12 +60,33 @@ interface CoverLetter {
   created_at: string;
 }
 
+interface Contact {
+  id: string;
+  name: string;
+  title: string | null;
+  email: string | null;
+  linkedin_url: string | null;
+  contact_type: string;
+  is_job_poster: boolean;
+  notes: string | null;
+  contacted_at: string | null;
+}
+
+const contactTypeLabels: Record<string, string> = {
+  recruiter: "Recruiter",
+  hiring_manager: "Hiring Manager",
+  team_member: "Team Member",
+  job_poster: "Job Poster",
+  hr_contact: "HR Contact",
+};
+
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
   const { data: job, error, isLoading } = useSWR<Job>(`/api/jobs/${id}`, fetcher);
+  const { data: contacts } = useSWR<Contact[]>(`/api/jobs/${id}/contacts`, fetcher);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -423,6 +444,76 @@ export default function JobDetailPage() {
                 <span>{new Date(job.updated_at).toLocaleDateString()}</span>
               </div>
             </div>
+          </div>
+
+          {/* Contacts */}
+          <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <User size={18} />
+              Contacts
+              {contacts && contacts.length > 0 && (
+                <span className="text-xs bg-[var(--color-bg-elevated)] px-2 py-0.5 rounded-full text-[var(--color-text-secondary)]">
+                  {contacts.length}
+                </span>
+              )}
+            </h2>
+
+            {contacts && contacts.length > 0 ? (
+              <div className="space-y-3">
+                {contacts.map((contact) => (
+                  <div
+                    key={contact.id}
+                    className="p-3 bg-[var(--color-bg-elevated)] rounded-lg"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{contact.name}</p>
+                        {contact.title && (
+                          <p className="text-xs text-[var(--color-text-secondary)]">
+                            {contact.title}
+                          </p>
+                        )}
+                        <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                          {contactTypeLabels[contact.contact_type] || contact.contact_type}
+                          {contact.is_job_poster && " • Job Poster"}
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        {contact.linkedin_url && (
+                          <a
+                            href={contact.linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 hover:bg-[var(--color-bg-secondary)] rounded transition-colors"
+                            title="View LinkedIn"
+                          >
+                            <Linkedin size={14} className="text-[#0077B5]" />
+                          </a>
+                        )}
+                        {contact.email && (
+                          <a
+                            href={`mailto:${contact.email}`}
+                            className="p-1.5 hover:bg-[var(--color-bg-secondary)] rounded transition-colors"
+                            title={contact.email}
+                          >
+                            <Mail size={14} className="text-[var(--color-text-secondary)]" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {contact.notes && (
+                      <p className="text-xs text-[var(--color-text-tertiary)] mt-2 border-t border-[var(--color-border-subtle)] pt-2">
+                        {contact.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--color-text-tertiary)]">
+                No contacts added yet
+              </p>
+            )}
           </div>
 
           {/* Cover Letter Generation */}

@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, User } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -22,6 +22,7 @@ interface Job {
   salary_max: number | null;
   salary_currency: string | null;
   employment_type: string | null;
+  contact_count: number;
 }
 
 export type SortField = "updated_at" | "created_at" | "priority" | "salary" | "title" | "company";
@@ -166,6 +167,9 @@ export function JobsTable({
                 <SortIcon field="title" />
               </div>
             </th>
+            <th className="w-8 px-1 py-3" title="Has contacts">
+              <User size={14} className="text-[var(--color-text-tertiary)] opacity-40" />
+            </th>
             <th
               className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
               onClick={() => handleSort("company")}
@@ -235,6 +239,13 @@ export function JobsTable({
                 >
                   {job.title}
                 </Link>
+              </td>
+              <td className="px-1 py-3 text-center">
+                {job.contact_count > 0 && (
+                  <span title={`${job.contact_count} contact${job.contact_count > 1 ? 's' : ''}`}>
+                    <User size={14} className="text-[var(--color-accent)] opacity-70" />
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3 text-[var(--color-text-secondary)]">
                 {job.company}

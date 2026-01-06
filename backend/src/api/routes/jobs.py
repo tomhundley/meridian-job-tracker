@@ -126,12 +126,32 @@ async def list_jobs(
     )
 
     result = await db.execute(query)
-    jobs = result.scalars().all()
+    jobs = list(result.scalars().all())
+
+    # Get contact counts for these jobs
+    if jobs:
+        job_ids = [job.id for job in jobs]
+        contact_count_query = (
+            select(JobContact.job_id, func.count(JobContact.id).label("count"))
+            .where(JobContact.job_id.in_(job_ids))
+            .group_by(JobContact.job_id)
+        )
+        contact_counts_result = await db.execute(contact_count_query)
+        contact_counts = {row.job_id: row.count for row in contact_counts_result}
+    else:
+        contact_counts = {}
 
     total_pages = (total + page_size - 1) // page_size
 
+    # Build response with contact counts
+    items = []
+    for job in jobs:
+        job_data = JobResponse.model_validate(job)
+        job_data.contact_count = contact_counts.get(job.id, 0)
+        items.append(job_data)
+
     return JobListResponse(
-        items=[JobResponse.model_validate(job) for job in jobs],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
