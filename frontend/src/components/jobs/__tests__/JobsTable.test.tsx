@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { JobsTable } from "../JobsTable";
 import useSWR from "swr";
 
@@ -16,6 +16,30 @@ vi.mock("swr", () => ({
 }));
 
 const mockUseSWR = useSWR as unknown as ReturnType<typeof vi.fn>;
+
+const createMockJob = (overrides = {}) => ({
+  id: "job-1",
+  title: "Engineer",
+  company: "Acme",
+  location: "Remote",
+  work_location_type: "remote",
+  status: "applied",
+  priority: 80,
+  created_at: new Date("2024-01-01").toISOString(),
+  updated_at: new Date("2024-01-01").toISOString(),
+  applied_at: null,
+  posted_at: null,
+  salary_min: null,
+  salary_max: null,
+  salary_currency: null,
+  employment_type: null,
+  contact_count: 0,
+  is_easy_apply: false,
+  is_favorite: false,
+  is_perfect_fit: false,
+  is_ai_forward: false,
+  ...overrides,
+});
 
 describe("JobsTable", () => {
   beforeEach(() => {
@@ -43,26 +67,93 @@ describe("JobsTable", () => {
 
   it("renders job rows", () => {
     mockUseSWR.mockReturnValue({
-      data: {
-        items: [
-          {
-            id: "job-1",
-            title: "Engineer",
-            company: "Acme",
-            location: "Remote",
-            status: "applied",
-            priority: 80,
-            created_at: new Date("2024-01-01").toISOString(),
-            applied_at: null,
-          },
-        ],
-      },
+      data: { items: [createMockJob()] },
       error: undefined,
       isLoading: false,
     });
     render(<JobsTable />);
     expect(screen.getByText("Engineer")).toBeInTheDocument();
     expect(screen.getByText("Acme")).toBeInTheDocument();
-    expect(screen.getByText("Remote")).toBeInTheDocument();
+    // Remote appears in both location column and work_location_type badge
+    expect(screen.getAllByText("Remote")).toHaveLength(2);
+  });
+
+  it("renders favorite icon when job is favorited", () => {
+    mockUseSWR.mockReturnValue({
+      data: { items: [createMockJob({ is_favorite: true })] },
+      error: undefined,
+      isLoading: false,
+    });
+    const { container } = render(<JobsTable />);
+    // Heart icon should be rendered with fill-red-400 class when favorited
+    const heartIcon = container.querySelector(".fill-red-400");
+    expect(heartIcon).toBeInTheDocument();
+  });
+
+  it("does not render favorite icon when job is not favorited", () => {
+    mockUseSWR.mockReturnValue({
+      data: { items: [createMockJob({ is_favorite: false })] },
+      error: undefined,
+      isLoading: false,
+    });
+    const { container } = render(<JobsTable />);
+    // Heart icon with fill should not be rendered
+    const heartIcon = container.querySelector(".fill-red-400");
+    expect(heartIcon).not.toBeInTheDocument();
+  });
+
+  it("renders easy apply icon when enabled", () => {
+    mockUseSWR.mockReturnValue({
+      data: { items: [createMockJob({ is_easy_apply: true })] },
+      error: undefined,
+      isLoading: false,
+    });
+    const { container } = render(<JobsTable />);
+    const zapIcon = container.querySelector(".text-green-400");
+    expect(zapIcon).toBeInTheDocument();
+  });
+
+  it("renders perfect fit icon when enabled", () => {
+    mockUseSWR.mockReturnValue({
+      data: { items: [createMockJob({ is_perfect_fit: true })] },
+      error: undefined,
+      isLoading: false,
+    });
+    const { container } = render(<JobsTable />);
+    const targetIcon = container.querySelector(".text-purple-400");
+    expect(targetIcon).toBeInTheDocument();
+  });
+
+  it("renders AI forward icon when enabled", () => {
+    mockUseSWR.mockReturnValue({
+      data: { items: [createMockJob({ is_ai_forward: true })] },
+      error: undefined,
+      isLoading: false,
+    });
+    const { container } = render(<JobsTable />);
+    const sparklesIcon = container.querySelector(".text-cyan-400");
+    expect(sparklesIcon).toBeInTheDocument();
+  });
+
+  it("renders all preference icons together", () => {
+    mockUseSWR.mockReturnValue({
+      data: {
+        items: [
+          createMockJob({
+            is_favorite: true,
+            is_easy_apply: true,
+            is_perfect_fit: true,
+            is_ai_forward: true,
+          }),
+        ],
+      },
+      error: undefined,
+      isLoading: false,
+    });
+    const { container } = render(<JobsTable />);
+    expect(container.querySelector(".fill-red-400")).toBeInTheDocument(); // favorite
+    expect(container.querySelector(".text-green-400")).toBeInTheDocument(); // easy apply
+    expect(container.querySelector(".text-purple-400")).toBeInTheDocument(); // perfect fit
+    expect(container.querySelector(".text-cyan-400")).toBeInTheDocument(); // ai forward
   });
 });
