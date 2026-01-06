@@ -179,10 +179,13 @@ meridian-job-tracker/
 
 ## Documentation
 
+- **[ELEGANT_JOB_TRACKER_PROJECT.md](ELEGANT_JOB_TRACKER_PROJECT.md)** - Comprehensive project documentation
 - `docs/api-reference.md` - Full API reference
 - `docs/agent-integration.md` - AI agent workflows
 - `docs/mcp-integration.md` - LinkedIn MCP integration
 - `docs/email-agent-workflow.md` - Email agent flow
+
+> **Central Documentation Hub**: All Meridian ecosystem project documentation is also available at [trh-meridian/docs/projects](https://github.com/ElegantSoftwareSolutions/trh-meridian/tree/main/docs/projects)
 
 ## Job Statuses
 

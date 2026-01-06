@@ -2,6 +2,12 @@
 
 This file is for AI agents working in this repo. Keep it concise and update when workflows change.
 
+> **Comprehensive Documentation**: See [ELEGANT_JOB_TRACKER_PROJECT.md](ELEGANT_JOB_TRACKER_PROJECT.md) for full project details, architecture, and implementation patterns.
+
+## Part of the Meridian Ecosystem
+
+This project integrates with other Meridian ecosystem components. Central documentation for all projects is available at [trh-meridian/docs/projects](https://github.com/ElegantSoftwareSolutions/trh-meridian/tree/main/docs/projects).
+
 ## Project Overview
 - Backend: FastAPI + async SQLAlchemy (`backend/src`)
 - Frontend: Next.js 15 (`frontend/`)
