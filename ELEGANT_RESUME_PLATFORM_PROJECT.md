@@ -23,14 +23,18 @@ The system comprises two primary components: **Sparkles AI Agent** for intellige
 3. [Personal Brand Website](#personal-brand-website)
 4. [Blog System & Semantic Search](#blog-system--semantic-search) ⭐ *Flagship Feature*
 5. [AI-Powered Content Creation](#ai-powered-content-creation) ⭐ *Flagship Feature*
-6. [Complete Technology Stack](#complete-technology-stack)
-7. [Architecture & System Design](#architecture--system-design)
-8. [Database Design & Data Modeling](#database-design--data-modeling)
-9. [Multi-Role Resume System](#multi-role-resume-system)
-10. [Security Architecture](#security-architecture)
-11. [AI/ML Integration](#aiml-integration)
-12. [Role-Based Contribution Analysis](#role-based-contribution-analysis)
-13. [Key Achievements & Metrics](#key-achievements--metrics)
+6. [Photo Gallery System](#photo-gallery-system) ⭐ *Flagship Feature*
+7. [Slack Notification Integration](#slack-notification-integration)
+8. [SEO & Discoverability](#seo--discoverability) ⭐ *Flagship Feature*
+9. [GA4 Analytics & Tag Management](#ga4-analytics--tag-management)
+10. [Complete Technology Stack](#complete-technology-stack)
+11. [Architecture & System Design](#architecture--system-design)
+12. [Database Design & Data Modeling](#database-design--data-modeling)
+13. [Multi-Role Resume System](#multi-role-resume-system)
+14. [Security Architecture](#security-architecture)
+15. [AI/ML Integration](#aiml-integration)
+16. [Role-Based Contribution Analysis](#role-based-contribution-analysis)
+17. [Key Achievements & Metrics](#key-achievements--metrics)
 
 ---
 
@@ -956,6 +960,1144 @@ This content creation system exemplifies **Tom Hundley's role as AI Orchestrator
 - **Continuous Improvement**: Feedback loops improve AI performance over time
 
 The result is a content engine that produces high-quality, technically accurate articles at a pace impossible for traditional content teams, while maintaining the editorial oversight necessary for professional publishing.
+
+---
+
+## Photo Gallery System
+
+### Overview
+
+The **Photo Gallery System** provides a sophisticated image presentation platform with album organization, masonry grid layouts, and an immersive lightbox viewing experience. Built on Supabase Storage with optimized delivery through Next.js Image, the system delivers professional-grade photo presentation with touch-optimized mobile interactions.
+
+### Gallery Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      PHOTO GALLERY ARCHITECTURE                            │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   DATA LAYER                                                               │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │  SUPABASE POSTGRESQL                                                │ │
+│   │                                                                     │ │
+│   │  ┌─────────────────┐         ┌─────────────────────────────────┐   │ │
+│   │  │     albums      │         │            photos               │   │ │
+│   │  │                 │         │                                 │   │ │
+│   │  │  id (UUID)      │◄────────│  album_id (FK)                 │   │ │
+│   │  │  slug (unique)  │         │  id (UUID)                     │   │ │
+│   │  │  title          │         │  url (storage path)            │   │ │
+│   │  │  description    │         │  thumbnail_url                 │   │ │
+│   │  │  cover_image_id │         │  alt_text                      │   │ │
+│   │  │  is_visible     │         │  width, height                 │   │ │
+│   │  │  display_order  │         │  display_order                 │   │ │
+│   │  │  created_at     │         │  metadata (JSONB)              │   │ │
+│   │  └─────────────────┘         └─────────────────────────────────┘   │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│   STORAGE LAYER                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │  SUPABASE STORAGE                                                   │ │
+│   │                                                                     │ │
+│   │  Bucket: gallery-images                                             │ │
+│   │  ├── /albums/{album_slug}/                                         │ │
+│   │  │   ├── original/  (full resolution)                              │ │
+│   │  │   ├── large/     (1920px max width)                             │ │
+│   │  │   ├── medium/    (1200px max width)                             │ │
+│   │  │   └── thumb/     (400px max width)                              │ │
+│   │  └── /covers/       (album cover images)                           │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│   PRESENTATION LAYER                                                       │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  MASONRY GRID                    LIGHTBOX VIEWER                    │ │
+│   │  ┌─────────────────────┐        ┌─────────────────────────────────┐│ │
+│   │  │ CSS Columns Layout  │        │  Full-Screen Overlay            ││ │
+│   │  │ • Responsive cols   │───────►│  • Keyboard navigation          ││ │
+│   │  │ • Lazy loading      │ Click  │  • Touch swipe gestures         ││ │
+│   │  │ • Blur placeholders │        │  • Preloaded adjacent images    ││ │
+│   │  │ • Hover effects     │        │  • EXIF metadata display        ││ │
+│   │  └─────────────────────┘        └─────────────────────────────────┘│ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Database Schema
+
+```sql
+-- Album organization
+CREATE TABLE albums (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    cover_image_id UUID REFERENCES photos(id),
+    is_visible BOOLEAN DEFAULT true,
+    display_order INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Individual photos
+CREATE TABLE photos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    album_id UUID REFERENCES albums(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    thumbnail_url TEXT,
+    alt_text TEXT,
+    caption TEXT,
+    width INTEGER,
+    height INTEGER,
+    display_order INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    -- EXIF data storage
+    taken_at TIMESTAMPTZ,
+    camera_model TEXT,
+    lens_info TEXT,
+    exposure_settings TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_photos_album ON photos(album_id);
+CREATE INDEX idx_albums_slug ON albums(slug);
+CREATE INDEX idx_albums_visible ON albums(is_visible) WHERE is_visible = true;
+```
+
+### Masonry Grid Implementation
+
+**PhotoGrid Component Architecture:**
+
+```typescript
+// Responsive masonry layout using CSS columns
+interface PhotoGridProps {
+  photos: Photo[];
+  onPhotoClick: (index: number) => void;
+  columns?: {
+    mobile: number;    // Default: 2
+    tablet: number;    // Default: 3
+    desktop: number;   // Default: 4
+  };
+}
+
+// CSS-based masonry (no JavaScript layout calculations)
+const gridStyles = `
+  .photo-grid {
+    column-count: 2;
+    column-gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .photo-grid { column-count: 3; }
+  }
+
+  @media (min-width: 1024px) {
+    .photo-grid { column-count: 4; }
+  }
+
+  .photo-item {
+    break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+`;
+```
+
+### Lightbox Viewer
+
+**Full-Screen Image Experience:**
+
+| Feature | Implementation | UX Benefit |
+|---------|----------------|------------|
+| **Keyboard Navigation** | ArrowLeft/Right, Escape | Desktop accessibility |
+| **Touch Swipe** | Touch event handlers | Mobile-native feel |
+| **Image Preloading** | Preload adjacent ±2 images | Instant transitions |
+| **Zoom Support** | Pinch-to-zoom, double-tap | Detail inspection |
+| **EXIF Display** | Optional metadata panel | Photography context |
+| **Share Integration** | Native Share API | Social distribution |
+
+```typescript
+// Lightbox navigation with preloading
+interface LightboxState {
+  isOpen: boolean;
+  currentIndex: number;
+  preloadedImages: Set<number>;
+}
+
+// Preload strategy: always keep ±2 images ready
+function preloadAdjacentImages(currentIndex: number, total: number) {
+  const toPreload = [
+    currentIndex - 2,
+    currentIndex - 1,
+    currentIndex + 1,
+    currentIndex + 2,
+  ].filter(i => i >= 0 && i < total);
+
+  toPreload.forEach(index => {
+    const img = new Image();
+    img.src = photos[index].url;
+  });
+}
+
+// Touch gesture handling
+const swipeThreshold = 50; // pixels
+const handleTouchEnd = (e: TouchEvent) => {
+  const deltaX = touchEndX - touchStartX;
+  if (Math.abs(deltaX) > swipeThreshold) {
+    deltaX > 0 ? goToPrevious() : goToNext();
+  }
+};
+```
+
+### Image Optimization Pipeline
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                 IMAGE OPTIMIZATION FLOW                        │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│   UPLOAD                                                      │
+│   ┌────────────┐                                             │
+│   │ Original   │  User uploads high-resolution image          │
+│   │ Image      │  (up to 20MB, JPEG/PNG/WebP)                │
+│   └─────┬──────┘                                             │
+│         │                                                     │
+│         ▼                                                     │
+│   PROCESSING (Server-side)                                    │
+│   ┌────────────────────────────────────────────────────────┐ │
+│   │                                                        │ │
+│   │  1. EXIF Extraction (camera, lens, settings)          │ │
+│   │  2. Orientation Correction (auto-rotate)              │ │
+│   │  3. Generate Variants:                                │ │
+│   │     • Large:  1920px (lightbox)                       │ │
+│   │     • Medium: 1200px (grid display)                   │ │
+│   │     • Thumb:  400px  (thumbnails)                     │ │
+│   │  4. WebP Conversion (with JPEG fallback)              │ │
+│   │  5. Blur Hash Generation (loading placeholders)       │ │
+│   │                                                        │ │
+│   └────────────────────────────────────────────────────────┘ │
+│         │                                                     │
+│         ▼                                                     │
+│   DELIVERY (Next.js Image)                                    │
+│   ┌────────────────────────────────────────────────────────┐ │
+│   │                                                        │ │
+│   │  • Automatic format negotiation (WebP/AVIF)           │ │
+│   │  • Responsive srcset generation                       │ │
+│   │  • Lazy loading with blur placeholder                 │ │
+│   │  • Edge caching via Vercel CDN                        │ │
+│   │                                                        │ │
+│   └────────────────────────────────────────────────────────┘ │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### Gallery Routing
+
+**Slug-Based Album Navigation:**
+
+```
+/gallery                    → Album grid (all visible albums)
+/gallery/[album-slug]       → Individual album view
+/gallery/[album-slug]?p=3   → Album with lightbox open to photo 3
+```
+
+---
+
+## Slack Notification Integration
+
+### Overview
+
+The **Slack Notification System** provides real-time alerts for critical user interactions, enabling immediate response to recruiter inquiries, contact form submissions, and newsletter subscriptions. The integration uses Slack's Block Kit for rich, actionable message formatting.
+
+### Multi-Channel Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    SLACK NOTIFICATION ARCHITECTURE                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   EVENT SOURCES                        SLACK WORKSPACE                      │
+│   ┌─────────────────────┐             ┌────────────────────────────────┐   │
+│   │                     │             │                                │   │
+│   │  RECRUITER ACTIONS  │             │  #resume (C0A6HRYHDH8)        │   │
+│   │  ├── Lead capture   │────────────►│  ├── Recruiter contact info   │   │
+│   │  ├── JD upload      │             │  ├── JD analysis summary      │   │
+│   │  └── Chat engagement│             │  └── Company & role details   │   │
+│   │                     │             │                                │   │
+│   ├─────────────────────┤             ├────────────────────────────────┤   │
+│   │                     │             │                                │   │
+│   │  CONTACT FORM       │             │  #contact (C0A6WPY47Q9)       │   │
+│   │  ├── Name           │────────────►│  ├── Visitor details          │   │
+│   │  ├── Email          │             │  ├── Message content          │   │
+│   │  └── Message        │             │  └── Reply-to action          │   │
+│   │                     │             │                                │   │
+│   ├─────────────────────┤             ├────────────────────────────────┤   │
+│   │                     │             │                                │   │
+│   │  NEWSLETTER         │             │  #newsletter (C0A62D4V72B)    │   │
+│   │  └── Subscription   │────────────►│  └── New subscriber alert     │   │
+│   │                     │             │                                │   │
+│   └─────────────────────┘             ├────────────────────────────────┤   │
+│                                       │                                │   │
+│                                       │  DIRECT MESSAGE to Tom        │   │
+│                                       │  └── High-priority alerts     │   │
+│                                       │                                │   │
+│                                       └────────────────────────────────┘   │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Channel Configuration
+
+| Channel | Slack ID | Purpose | Alert Priority |
+|---------|----------|---------|----------------|
+| **#resume** | C0A6HRYHDH8 | Recruiter leads, JD uploads, chat engagement | High |
+| **#contact** | C0A6WPY47Q9 | Contact form submissions | Medium |
+| **#newsletter** | C0A62D4V72B | New newsletter subscriptions | Low |
+| **DM to Tom** | User-specific | Critical alerts requiring immediate attention | Critical |
+
+### Slack Client Implementation
+
+```typescript
+// src/lib/notifications/slack.ts
+
+import { WebClient, Block, KnownBlock } from '@slack/web-api';
+
+const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
+
+// Channel IDs from environment
+const CHANNELS = {
+  resume: process.env.SLACK_CHANNEL_RESUME!,      // C0A6HRYHDH8
+  contact: process.env.SLACK_CHANNEL_CONTACT!,    // C0A6WPY47Q9
+  newsletter: process.env.SLACK_CHANNEL_NEWSLETTER!, // C0A62D4V72B
+};
+
+interface SlackNotification {
+  channel: keyof typeof CHANNELS;
+  blocks: (Block | KnownBlock)[];
+  text: string;  // Fallback for notifications
+  thread_ts?: string;  // For threaded replies
+}
+
+async function sendSlackNotification(notification: SlackNotification) {
+  try {
+    const result = await slack.chat.postMessage({
+      channel: CHANNELS[notification.channel],
+      blocks: notification.blocks,
+      text: notification.text,
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+
+    return { success: true, ts: result.ts };
+  } catch (error) {
+    console.error('Slack notification failed:', error);
+    return { success: false, error };
+  }
+}
+```
+
+### Block Kit Message Templates
+
+**Recruiter Lead Notification:**
+
+```typescript
+function buildRecruiterLeadBlocks(lead: RecruiterLead): KnownBlock[] {
+  return [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: '🎯 New Recruiter Lead',
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        {
+          type: 'mrkdwn',
+          text: `*Name:*\n${lead.name}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Company:*\n${lead.company || 'Not provided'}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Email:*\n${lead.email}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Phone:*\n${lead.phone || 'Not provided'}`,
+        },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Role Viewing:* ${lead.roleViewed?.toUpperCase() || 'Unknown'}`,
+      },
+    },
+    // JD Analysis section (if uploaded)
+    ...(lead.jdAnalysis ? [
+      {
+        type: 'divider',
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*📄 JD Analysis*\n*Overall Fit:* ${lead.jdAnalysis.overallFit}\n*Technologies:* ${lead.jdAnalysis.technologies.join(', ')}`,
+        },
+      },
+    ] : []),
+    {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `Submitted at ${new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })}`,
+        },
+      ],
+    },
+  ];
+}
+```
+
+**Contact Form Notification:**
+
+```typescript
+function buildContactFormBlocks(contact: ContactForm): KnownBlock[] {
+  return [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: '📬 New Contact Form Submission',
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*From:*\n${contact.name}` },
+        { type: 'mrkdwn', text: `*Email:*\n${contact.email}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Message:*\n>${contact.message.replace(/\n/g, '\n>')}`,
+      },
+    },
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '📧 Reply via Email', emoji: true },
+          url: `mailto:${contact.email}?subject=Re: Your message on thomashundley.com`,
+          action_id: 'reply_email',
+        },
+      ],
+    },
+  ];
+}
+```
+
+### Thread-Based Conversations
+
+```typescript
+// Store thread_ts for follow-up messages
+async function sendInitialNotification(lead: RecruiterLead) {
+  const result = await sendSlackNotification({
+    channel: 'resume',
+    blocks: buildRecruiterLeadBlocks(lead),
+    text: `New recruiter lead: ${lead.name} from ${lead.company}`,
+  });
+
+  // Store thread_ts for follow-ups
+  if (result.success && result.ts) {
+    await supabase
+      .from('recruiter_contacts')
+      .update({ slack_thread_ts: result.ts })
+      .eq('id', lead.id);
+  }
+
+  return result;
+}
+
+// Add follow-up to existing thread
+async function addThreadReply(leadId: string, message: string) {
+  const { data: lead } = await supabase
+    .from('recruiter_contacts')
+    .select('slack_thread_ts')
+    .eq('id', leadId)
+    .single();
+
+  if (lead?.slack_thread_ts) {
+    await sendSlackNotification({
+      channel: 'resume',
+      blocks: [{ type: 'section', text: { type: 'mrkdwn', text: message } }],
+      text: message,
+      thread_ts: lead.slack_thread_ts,
+    });
+  }
+}
+```
+
+---
+
+## SEO & Discoverability
+
+### Overview
+
+The **SEO Implementation** on thomashundley.com is designed for **dual optimization**: traditional search engine crawlers (Google, Bing) AND modern AI/LLM systems (ChatGPT, Claude, Perplexity). This comprehensive approach ensures maximum discoverability across all search paradigms.
+
+### SEO Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    SEO & DISCOVERABILITY ARCHITECTURE                       │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   TRADITIONAL SEO                      LLM/AI OPTIMIZATION                 │
+│   ┌─────────────────────────────┐     ┌─────────────────────────────────┐ │
+│   │                             │     │                                 │ │
+│   │  META TAGS                  │     │  STRUCTURED DATA                │ │
+│   │  ├── <title>                │     │  ├── JSON-LD Schema.org         │ │
+│   │  ├── <meta description>    │     │  │   ├── Person                 │ │
+│   │  ├── <meta keywords>       │     │  │   ├── Organization           │ │
+│   │  └── Canonical URLs        │     │  │   ├── WebSite                │ │
+│   │                             │     │  │   ├── BreadcrumbList        │ │
+│   │  SOCIAL SHARING             │     │  │   └── BlogPosting           │ │
+│   │  ├── Open Graph (og:*)     │     │  │                               │ │
+│   │  ├── Twitter Cards         │     │  └── Rich Results Eligible      │ │
+│   │  └── LinkedIn Preview      │     │                                 │ │
+│   │                             │     │  SEMANTIC HTML                  │ │
+│   │  TECHNICAL SEO              │     │  ├── <article>, <nav>, <main>  │ │
+│   │  ├── robots.txt            │     │  ├── Heading hierarchy (h1-h6) │ │
+│   │  ├── sitemap.xml           │     │  └── ARIA landmarks            │ │
+│   │  ├── Crawl directives      │     │                                 │ │
+│   │  └── Page speed (Core Web  │     │  CONTENT STRUCTURE              │ │
+│   │      Vitals)               │     │  ├── Clear, scannable format   │ │
+│   │                             │     │  ├── Contextual interlinking   │ │
+│   └─────────────────────────────┘     │  └── Comprehensive topic coverage│ │
+│                                       └─────────────────────────────────┘ │
+│                                                                            │
+│   INDEXING INFRASTRUCTURE                                                  │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  Dynamic Sitemap (sitemap.ts)                                       │ │
+│   │  ├── Auto-generated from database content                          │ │
+│   │  ├── Priority-weighted pages                                        │ │
+│   │  ├── Last-modified timestamps                                       │ │
+│   │  └── Change frequency hints                                         │ │
+│   │                                                                     │ │
+│   │  Google Search Console Verification                                 │ │
+│   │  ├── Domain ownership verified                                      │ │
+│   │  ├── Sitemap submission                                             │ │
+│   │  └── Performance monitoring                                         │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### JSON-LD Structured Data
+
+**Person Schema (Tom Hundley):**
+
+```typescript
+// src/lib/constants.ts - Structured data configuration
+
+const personSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Tom Hundley',
+  alternateName: 'Thomas Hundley',
+  jobTitle: 'Technology Executive & AI Orchestrator',
+  description: 'Experienced technology executive specializing in AI-orchestrated development, enterprise architecture, and digital transformation.',
+  url: 'https://thomashundley.com',
+  image: 'https://thomashundley.com/images/tom-hundley-professional.jpg',
+  email: 'tom@thomashundley.com',
+  sameAs: [
+    'https://linkedin.com/in/tomhundley',
+    'https://github.com/tomhundley',
+    'https://twitter.com/tomhundley',
+  ],
+  knowsAbout: [
+    'Artificial Intelligence',
+    'Machine Learning',
+    'Software Architecture',
+    'Cloud Computing',
+    'Digital Transformation',
+    'Executive Leadership',
+    'AI-Orchestrated Development',
+  ],
+  worksFor: {
+    '@type': 'Organization',
+    name: 'Elegant Software Solutions',
+    url: 'https://elegantsoftwaresolutions.com',
+  },
+};
+```
+
+**WebSite Schema:**
+
+```typescript
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Tom Hundley - Technology Executive',
+  alternateName: 'thomashundley.com',
+  url: 'https://thomashundley.com',
+  description: 'Professional portfolio and resume platform for Tom Hundley, featuring AI-powered recruiter engagement and multi-role resume presentation.',
+  publisher: {
+    '@type': 'Person',
+    name: 'Tom Hundley',
+  },
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: 'https://thomashundley.com/blog?q={search_term_string}',
+    },
+    'query-input': 'required name=search_term_string',
+  },
+};
+```
+
+**BlogPosting Schema (Dynamic):**
+
+```typescript
+function generateBlogPostSchema(post: BlogPost) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.excerpt,
+    author: {
+      '@type': 'Person',
+      name: 'Tom Hundley',
+      url: 'https://thomashundley.com',
+    },
+    datePublished: post.publishedAt,
+    dateModified: post.updatedAt || post.publishedAt,
+    image: post.featuredImage,
+    publisher: {
+      '@type': 'Organization',
+      name: 'Tom Hundley',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://thomashundley.com/logo.png',
+      },
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `https://thomashundley.com/blog/${post.slug}`,
+    },
+    keywords: post.tags.join(', '),
+    wordCount: post.wordCount,
+    timeRequired: `PT${post.readingTime}M`,
+  };
+}
+```
+
+### Open Graph & Twitter Cards
+
+```typescript
+// Next.js Metadata API implementation
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const page = await getPageData(params.slug);
+
+  return {
+    title: page.title,
+    description: page.description,
+    keywords: page.keywords,
+
+    // Open Graph
+    openGraph: {
+      type: 'website',
+      locale: 'en_US',
+      url: `https://thomashundley.com${page.path}`,
+      siteName: 'Tom Hundley',
+      title: page.title,
+      description: page.description,
+      images: [
+        {
+          url: page.ogImage || 'https://thomashundley.com/og-default.jpg',
+          width: 1200,
+          height: 630,
+          alt: page.title,
+        },
+      ],
+    },
+
+    // Twitter Cards
+    twitter: {
+      card: 'summary_large_image',
+      site: '@tomhundley',
+      creator: '@tomhundley',
+      title: page.title,
+      description: page.description,
+      images: [page.twitterImage || page.ogImage],
+    },
+
+    // Additional meta
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
+
+    alternates: {
+      canonical: `https://thomashundley.com${page.path}`,
+    },
+  };
+}
+```
+
+### Dynamic Sitemap Generation
+
+```typescript
+// src/app/sitemap.ts
+
+import { MetadataRoute } from 'next';
+import { supabase } from '@/lib/supabase';
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = 'https://thomashundley.com';
+
+  // Static pages
+  const staticPages = [
+    { url: baseUrl, lastModified: new Date(), priority: 1.0, changeFrequency: 'weekly' },
+    { url: `${baseUrl}/resume`, lastModified: new Date(), priority: 0.9, changeFrequency: 'monthly' },
+    { url: `${baseUrl}/projects`, lastModified: new Date(), priority: 0.8, changeFrequency: 'monthly' },
+    { url: `${baseUrl}/blog`, lastModified: new Date(), priority: 0.8, changeFrequency: 'daily' },
+    { url: `${baseUrl}/gallery`, lastModified: new Date(), priority: 0.6, changeFrequency: 'monthly' },
+    { url: `${baseUrl}/contact`, lastModified: new Date(), priority: 0.5, changeFrequency: 'yearly' },
+  ];
+
+  // Dynamic blog posts
+  const { data: posts } = await supabase
+    .from('blog_posts')
+    .select('slug, updated_at')
+    .eq('is_published', true);
+
+  const blogPages = posts?.map(post => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.updated_at),
+    priority: 0.7,
+    changeFrequency: 'monthly' as const,
+  })) || [];
+
+  // Dynamic gallery albums
+  const { data: albums } = await supabase
+    .from('albums')
+    .select('slug, updated_at')
+    .eq('is_visible', true);
+
+  const galleryPages = albums?.map(album => ({
+    url: `${baseUrl}/gallery/${album.slug}`,
+    lastModified: new Date(album.updated_at),
+    priority: 0.5,
+    changeFrequency: 'monthly' as const,
+  })) || [];
+
+  return [...staticPages, ...blogPages, ...galleryPages];
+}
+```
+
+### Robots.txt Configuration
+
+```typescript
+// src/app/robots.ts
+
+import { MetadataRoute } from 'next';
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: [
+      {
+        userAgent: '*',
+        allow: '/',
+        disallow: [
+          '/admin/',
+          '/api/',
+          '/_next/',
+          '/private/',
+        ],
+      },
+      {
+        userAgent: 'GPTBot',
+        allow: '/',
+      },
+      {
+        userAgent: 'ChatGPT-User',
+        allow: '/',
+      },
+      {
+        userAgent: 'Claude-Web',
+        allow: '/',
+      },
+      {
+        userAgent: 'anthropic-ai',
+        allow: '/',
+      },
+    ],
+    sitemap: 'https://thomashundley.com/sitemap.xml',
+    host: 'https://thomashundley.com',
+  };
+}
+```
+
+### Target Keywords
+
+| Category | Keywords |
+|----------|----------|
+| **Primary** | Tom Hundley, Thomas Hundley, Technology Executive, CTO, AI Orchestrator |
+| **Technical** | AI-Orchestrated Development, Vibe Coding, Claude AI, Full-Stack Development |
+| **Skills** | TypeScript, React, Next.js, Node.js, PostgreSQL, Cloud Architecture |
+| **Industry** | Software Engineering, Digital Transformation, Enterprise Architecture |
+| **Location** | Dallas, Texas, Remote, USA |
+
+---
+
+## GA4 Analytics & Tag Management
+
+### Overview
+
+The **Google Analytics 4 & Tag Management** implementation provides comprehensive user behavior tracking with **GDPR-compliant consent management**, **Google Consent Mode v2** integration, and detailed event tracking for recruiter engagement analytics.
+
+### Analytics Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                   GA4 & GTM ANALYTICS ARCHITECTURE                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   CONSENT LAYER (GDPR/CCPA Compliant)                                      │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  COOKIE CONSENT MODAL                                               │ │
+│   │  ┌───────────────────────────────────────────────────────────────┐ │ │
+│   │  │                                                               │ │ │
+│   │  │  "We use cookies to improve your experience..."               │ │ │
+│   │  │                                                               │ │ │
+│   │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐    │ │ │
+│   │  │  │ Accept All   │  │ Reject All   │  │ Customize        │    │ │ │
+│   │  │  └──────────────┘  └──────────────┘  └──────────────────┘    │ │ │
+│   │  │                                                               │ │ │
+│   │  │  Categories:                                                  │ │ │
+│   │  │  ☑ Essential (always on)                                      │ │ │
+│   │  │  ☐ Analytics (GA4 tracking)                                   │ │ │
+│   │  │  ☐ Marketing (conversion tracking)                            │ │ │
+│   │  │                                                               │ │ │
+│   │  └───────────────────────────────────────────────────────────────┘ │ │
+│   │                                                                     │ │
+│   │  Cookie: consent_preferences (90-day expiry)                        │ │
+│   │  Storage: { analytics: boolean, marketing: boolean, timestamp }    │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│   GOOGLE CONSENT MODE V2                                                   │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  Default State (before consent):                                    │ │
+│   │  ┌─────────────────────────────────────────────────────────────┐   │ │
+│   │  │  analytics_storage: 'denied'                                │   │ │
+│   │  │  ad_storage: 'denied'                                       │   │ │
+│   │  │  ad_user_data: 'denied'                                     │   │ │
+│   │  │  ad_personalization: 'denied'                               │   │ │
+│   │  │  functionality_storage: 'granted'                           │   │ │
+│   │  │  personalization_storage: 'denied'                          │   │ │
+│   │  │  security_storage: 'granted'                                │   │ │
+│   │  └─────────────────────────────────────────────────────────────┘   │ │
+│   │                                                                     │ │
+│   │  After Consent:                                                     │ │
+│   │  gtag('consent', 'update', { analytics_storage: 'granted', ... })  │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│   TAG MANAGEMENT (GTM)                                                     │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  Container ID: GTM-XXXXXXX                                         │ │
+│   │                                                                     │ │
+│   │  Tags:                                                              │ │
+│   │  ├── GA4 Configuration                                             │ │
+│   │  ├── GA4 Event Tags (custom events)                                │ │
+│   │  ├── Consent Mode Initialization                                   │ │
+│   │  └── Web Vitals Tracking                                           │ │
+│   │                                                                     │ │
+│   │  Triggers:                                                          │ │
+│   │  ├── Page View                                                     │ │
+│   │  ├── DOM Ready                                                     │ │
+│   │  ├── Custom Events (dataLayer.push)                                │ │
+│   │  └── Scroll Depth (25%, 50%, 75%, 90%)                            │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│   GA4 MEASUREMENT (G-XXXXXXXXXX)                                           │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  Automatically Collected:                                          │ │
+│   │  ├── page_view                                                     │ │
+│   │  ├── session_start                                                 │ │
+│   │  ├── first_visit                                                   │ │
+│   │  ├── user_engagement                                               │ │
+│   │  └── scroll                                                        │ │
+│   │                                                                     │ │
+│   │  Custom Events:                                                     │ │
+│   │  ├── resume_role_switch                                            │ │
+│   │  ├── resume_pdf_download                                           │ │
+│   │  ├── chat_message_sent                                             │ │
+│   │  ├── jd_upload                                                     │ │
+│   │  ├── recruiter_lead_submit                                         │ │
+│   │  ├── contact_form_submit                                           │ │
+│   │  ├── newsletter_subscribe                                          │ │
+│   │  └── gallery_lightbox_open                                         │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Consent Management Implementation
+
+```typescript
+// src/lib/analytics/consent.ts
+
+interface ConsentPreferences {
+  essential: true;  // Always granted
+  analytics: boolean;
+  marketing: boolean;
+  timestamp: string;
+}
+
+const CONSENT_COOKIE = 'consent_preferences';
+const CONSENT_EXPIRY_DAYS = 90;
+
+// Initialize Consent Mode v2 defaults
+function initializeConsentDefaults() {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('consent', 'default', {
+      analytics_storage: 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      functionality_storage: 'granted',
+      personalization_storage: 'denied',
+      security_storage: 'granted',
+      wait_for_update: 500,  // Wait 500ms for consent update
+    });
+  }
+}
+
+// Update consent after user choice
+function updateConsent(preferences: ConsentPreferences) {
+  // Save to cookie
+  setCookie(CONSENT_COOKIE, JSON.stringify(preferences), CONSENT_EXPIRY_DAYS);
+
+  // Update Google Consent Mode
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('consent', 'update', {
+      analytics_storage: preferences.analytics ? 'granted' : 'denied',
+      ad_storage: preferences.marketing ? 'granted' : 'denied',
+      ad_user_data: preferences.marketing ? 'granted' : 'denied',
+      ad_personalization: preferences.marketing ? 'granted' : 'denied',
+    });
+  }
+}
+
+// Check for existing consent
+function getStoredConsent(): ConsentPreferences | null {
+  const cookie = getCookie(CONSENT_COOKIE);
+  if (cookie) {
+    try {
+      return JSON.parse(cookie);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+```
+
+### GTM Integration Component
+
+```typescript
+// src/components/analytics/GoogleTagManager.tsx
+
+'use client';
+
+import Script from 'next/script';
+import { useEffect } from 'react';
+
+const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID!;
+
+export function GoogleTagManager() {
+  useEffect(() => {
+    // Initialize consent defaults before GTM loads
+    initializeConsentDefaults();
+
+    // Check for stored consent and apply
+    const storedConsent = getStoredConsent();
+    if (storedConsent) {
+      updateConsent(storedConsent);
+    }
+  }, []);
+
+  return (
+    <>
+      {/* GTM Script */}
+      <Script
+        id="gtm-script"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','${GTM_ID}');
+          `,
+        }}
+      />
+
+      {/* GTM NoScript Fallback */}
+      <noscript>
+        <iframe
+          src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
+          height="0"
+          width="0"
+          style={{ display: 'none', visibility: 'hidden' }}
+        />
+      </noscript>
+    </>
+  );
+}
+```
+
+### Custom Event Tracking
+
+```typescript
+// src/lib/analytics/events.ts
+
+type EventName =
+  | 'resume_role_switch'
+  | 'resume_pdf_download'
+  | 'chat_message_sent'
+  | 'jd_upload'
+  | 'recruiter_lead_submit'
+  | 'contact_form_submit'
+  | 'newsletter_subscribe'
+  | 'gallery_lightbox_open';
+
+interface EventParams {
+  [key: string]: string | number | boolean;
+}
+
+function trackEvent(eventName: EventName, params: EventParams = {}) {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', eventName, {
+      ...params,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Also push to dataLayer for GTM
+  if (typeof window !== 'undefined' && window.dataLayer) {
+    window.dataLayer.push({
+      event: eventName,
+      ...params,
+    });
+  }
+}
+
+// Typed event helpers
+export const analytics = {
+  roleSwitch: (fromRole: string, toRole: string) =>
+    trackEvent('resume_role_switch', { from_role: fromRole, to_role: toRole }),
+
+  pdfDownload: (role: string, template: string) =>
+    trackEvent('resume_pdf_download', { role, template }),
+
+  chatMessage: (role: string, messageLength: number) =>
+    trackEvent('chat_message_sent', { role, message_length: messageLength }),
+
+  jdUpload: (fileType: string, fileSize: number) =>
+    trackEvent('jd_upload', { file_type: fileType, file_size: fileSize }),
+
+  recruiterLead: (role: string, hasJd: boolean) =>
+    trackEvent('recruiter_lead_submit', { role, has_jd: hasJd }),
+
+  contactForm: () =>
+    trackEvent('contact_form_submit'),
+
+  newsletterSubscribe: (source: string) =>
+    trackEvent('newsletter_subscribe', { source }),
+
+  galleryLightbox: (albumSlug: string, photoIndex: number) =>
+    trackEvent('gallery_lightbox_open', { album: albumSlug, photo_index: photoIndex }),
+};
+```
+
+### Core Web Vitals Tracking
+
+```typescript
+// src/lib/analytics/web-vitals.ts
+
+import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals';
+
+function sendToAnalytics(metric: {
+  name: string;
+  value: number;
+  id: string;
+  delta: number;
+}) {
+  // Send to GA4
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', metric.name, {
+      event_category: 'Web Vitals',
+      event_label: metric.id,
+      value: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
+      non_interaction: true,
+    });
+  }
+}
+
+export function initWebVitals() {
+  onCLS(sendToAnalytics);   // Cumulative Layout Shift
+  onINP(sendToAnalytics);   // Interaction to Next Paint
+  onLCP(sendToAnalytics);   // Largest Contentful Paint
+  onFCP(sendToAnalytics);   // First Contentful Paint
+  onTTFB(sendToAnalytics);  // Time to First Byte
+}
+```
+
+### Analytics Dashboard Metrics
+
+| Metric Category | Events Tracked | Business Insight |
+|-----------------|----------------|------------------|
+| **Engagement** | page_view, scroll_depth, time_on_page | Content effectiveness |
+| **Resume** | role_switch, pdf_download | Role interest distribution |
+| **Sparkles AI** | chat_message, jd_upload | Recruiter engagement depth |
+| **Lead Gen** | recruiter_lead, contact_form | Conversion funnel |
+| **Newsletter** | subscribe, unsubscribe | Audience growth |
+| **Performance** | LCP, CLS, INP, FCP, TTFB | Technical health |
 
 ---
 
