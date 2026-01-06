@@ -392,6 +392,14 @@ async def update_job_status(
     if status_update.status == JobStatus.APPLIED and job.applied_at is None:
         job.applied_at = datetime.utcnow()
 
+    # Handle decline reasons
+    if status_update.user_decline_reasons is not None:
+        job.user_decline_reasons = status_update.user_decline_reasons
+    if status_update.company_decline_reasons is not None:
+        job.company_decline_reasons = status_update.company_decline_reasons
+    if status_update.decline_notes is not None:
+        job.decline_notes = status_update.decline_notes
+
     await db.flush()
     await db.refresh(job)
     return job

@@ -77,6 +77,35 @@ async def engine():
         )
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+        # Seed decline reason lookup tables (separate statements for asyncpg)
+        await conn.execute(
+            text(
+                """
+                INSERT INTO user_decline_reasons (code, display_name, category, sort_order, is_active, created_at)
+                VALUES
+                    ('salary_too_low', 'Salary below expectations', 'compensation', 1, true, NOW()),
+                    ('not_remote', 'Not fully remote', 'location', 1, true, NOW()),
+                    ('wrong_tech_stack', 'Technology stack not preferred', 'role_fit', 1, true, NOW()),
+                    ('found_better', 'Found better opportunity', 'personal', 1, true, NOW()),
+                    ('other', 'Other reason', 'personal', 99, true, NOW())
+                ON CONFLICT (code) DO NOTHING
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                """
+                INSERT INTO company_decline_reasons (code, display_name, category, sort_order, is_active, created_at)
+                VALUES
+                    ('selected_other', 'Selected another candidate', 'candidate_selection', 1, true, NOW()),
+                    ('insufficient_experience', 'Not enough experience', 'experience_skills', 1, true, NOW()),
+                    ('failed_technical', 'Did not pass technical assessment', 'experience_skills', 2, true, NOW()),
+                    ('ghosted', 'No response / ghosted', 'other', 1, true, NOW()),
+                    ('other', 'Other reason', 'other', 99, true, NOW())
+                ON CONFLICT (code) DO NOTHING
+                """
+            )
+        )
 
     yield engine
 

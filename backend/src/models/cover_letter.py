@@ -53,7 +53,7 @@ class CoverLetter(Base):
 
     # Generation metadata
     target_role: Mapped[RoleType] = mapped_column(
-        Enum(RoleType, name="role_type", create_type=False),
+        Enum(RoleType, name="role_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     generation_prompt: Mapped[str | None] = mapped_column(Text)
