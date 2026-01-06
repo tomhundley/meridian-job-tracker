@@ -8,13 +8,13 @@ Mark jobs at AI-forward companies or for AI-focused roles.
 
 ## API Endpoint
 
-PATCH `http://localhost:8000/api/jobs/{job_id}`
+PATCH `http://localhost:8000/api/v1/jobs/{job_id}`
 
 ## Usage
 
 Mark as AI-forward:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}" \
   -H "Content-Type: application/json" \
   -d '{"is_ai_forward": true}' | jq '.title, .company, .is_ai_forward'
 ```
@@ -25,13 +25,13 @@ Jobs are automatically analyzed for AI-forward status during ingestion.
 Use `/analyze-job` to re-analyze:
 
 ```bash
-curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/analyze?apply_suggestions=true" | jq '.is_ai_forward, .ai_confidence'
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{job_id}/analyze?apply_suggestions=true" | jq '.is_ai_forward, .ai_confidence'
 ```
 
 ## Filter AI-Forward Jobs
 
 ```bash
-curl -s "http://localhost:8000/api/jobs?is_ai_forward=true" | jq '.items[] | {title, company, priority}'
+curl -s "http://localhost:8000/api/v1/jobs?is_ai_forward=true" | jq '.items[] | {title, company, priority}'
 ```
 
 ## AI-Forward Detection Keywords

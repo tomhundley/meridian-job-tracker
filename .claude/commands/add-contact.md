@@ -8,12 +8,12 @@ Track hiring team members, recruiters, and other contacts for each job.
 
 ## API Endpoint
 
-POST `http://localhost:8000/api/jobs/{job_id}/contacts`
+POST `http://localhost:8000/api/v1/jobs/{job_id}/contacts`
 
 ## Usage
 
 ```bash
-curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/contacts" \
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{job_id}/contacts" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Jane Smith",
@@ -38,13 +38,13 @@ curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/contacts" \
 ## List Contacts for Job
 
 ```bash
-curl -s "http://localhost:8000/api/jobs/{job_id}/contacts" | jq
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}/contacts" | jq
 ```
 
 ## Update Contact
 
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/contacts/{contact_id}" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}/contacts/{contact_id}" \
   -H "Content-Type: application/json" \
   -d '{
     "notes": "Had initial call, very responsive"
@@ -54,7 +54,7 @@ curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/contacts/{contact_id}"
 ## Delete Contact
 
 ```bash
-curl -s -X DELETE "http://localhost:8000/api/jobs/{job_id}/contacts/{contact_id}"
+curl -s -X DELETE "http://localhost:8000/api/v1/jobs/{job_id}/contacts/{contact_id}"
 ```
 
 ## Arguments

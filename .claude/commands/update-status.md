@@ -8,7 +8,7 @@ Change a job's status through the application workflow.
 
 ## API Endpoint
 
-PATCH `http://localhost:8000/api/jobs/{job_id}/status`
+PATCH `http://localhost:8000/api/v1/jobs/{job_id}/status`
 
 ## Job Statuses
 
@@ -26,7 +26,7 @@ PATCH `http://localhost:8000/api/jobs/{job_id}/status`
 ## Usage
 
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}/status" \
   -H "Content-Type: application/json" \
   -d '{"status": "applied"}' | jq
 ```
@@ -35,7 +35,7 @@ curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
 
 When marking as rejected or withdrawn:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}/status" \
   -H "Content-Type: application/json" \
   -d '{
     "status": "rejected",
@@ -48,7 +48,7 @@ curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
 
 Update multiple jobs at once:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/bulk/status" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/bulk/status" \
   -H "Content-Type: application/json" \
   -d '{
     "job_ids": ["uuid1", "uuid2"],

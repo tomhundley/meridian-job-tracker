@@ -13,18 +13,18 @@ Analyze a job in the database to determine:
 
 ## API Endpoint
 
-POST `http://localhost:8000/api/jobs/{job_id}/analyze`
+POST `http://localhost:8000/api/v1/jobs/{job_id}/analyze`
 
 ## Usage
 
 Analyze a job (read-only):
 ```bash
-curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/analyze" | jq
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{job_id}/analyze" | jq
 ```
 
 Analyze and apply suggestions to job:
 ```bash
-curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/analyze?apply_suggestions=true" | jq
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{job_id}/analyze?apply_suggestions=true" | jq
 ```
 
 ## Arguments

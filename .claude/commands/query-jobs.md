@@ -8,12 +8,12 @@ Use the jobs API to search and filter your tracked jobs.
 
 ## API Endpoint
 
-GET `http://localhost:8000/api/jobs`
+GET `http://localhost:8000/api/v1/jobs`
 
 ## Basic Query
 
 ```bash
-curl -s "http://localhost:8000/api/jobs" | jq '.items[] | {title, company, status, priority}'
+curl -s "http://localhost:8000/api/v1/jobs" | jq '.items[] | {title, company, status, priority}'
 ```
 
 ## Filter Parameters
@@ -42,64 +42,64 @@ curl -s "http://localhost:8000/api/jobs" | jq '.items[] | {title, company, statu
 
 ### By Status
 ```bash
-curl -s "http://localhost:8000/api/jobs?status=saved" | jq '.items'
-curl -s "http://localhost:8000/api/jobs?status=applied" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?status=saved" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?status=applied" | jq '.items'
 ```
 
 ### By Role
 ```bash
-curl -s "http://localhost:8000/api/jobs?target_role=vp" | jq '.items'
-curl -s "http://localhost:8000/api/jobs?target_role=cto" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?target_role=vp" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?target_role=cto" | jq '.items'
 ```
 
 ### By Flags
 ```bash
-curl -s "http://localhost:8000/api/jobs?is_easy_apply=true" | jq '.items'
-curl -s "http://localhost:8000/api/jobs?is_ai_forward=true" | jq '.items'
-curl -s "http://localhost:8000/api/jobs?is_favorite=true" | jq '.items'
-curl -s "http://localhost:8000/api/jobs?is_perfect_fit=true" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?is_easy_apply=true" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?is_ai_forward=true" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?is_favorite=true" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?is_perfect_fit=true" | jq '.items'
 ```
 
 ### By Salary
 ```bash
-curl -s "http://localhost:8000/api/jobs?min_salary=300000" | jq '.items'
-curl -s "http://localhost:8000/api/jobs?min_salary=350000&max_salary=500000" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?min_salary=300000" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?min_salary=350000&max_salary=500000" | jq '.items'
 ```
 
 ### By Priority
 ```bash
-curl -s "http://localhost:8000/api/jobs?min_priority=80" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?min_priority=80" | jq '.items'
 ```
 
 ### By Posting Age
 ```bash
-curl -s "http://localhost:8000/api/jobs?max_age_days=7" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?max_age_days=7" | jq '.items'
 ```
 
 ### Combined Filters
 ```bash
 # High-priority VP roles that are AI-forward and Easy Apply
-curl -s "http://localhost:8000/api/jobs?target_role=vp&is_ai_forward=true&is_easy_apply=true&min_priority=70" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?target_role=vp&is_ai_forward=true&is_easy_apply=true&min_priority=70" | jq '.items'
 
 # Remote jobs ready to apply
-curl -s "http://localhost:8000/api/jobs?work_location_type=remote&status=ready_to_apply" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?work_location_type=remote&status=ready_to_apply" | jq '.items'
 ```
 
 ### Sorting
 ```bash
 # By priority (highest first)
-curl -s "http://localhost:8000/api/jobs?sort_by=priority&sort_order=desc" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?sort_by=priority&sort_order=desc" | jq '.items'
 
 # By salary (highest first)
-curl -s "http://localhost:8000/api/jobs?sort_by=salary&sort_order=desc" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?sort_by=salary&sort_order=desc" | jq '.items'
 
 # Most recently updated
-curl -s "http://localhost:8000/api/jobs?sort_by=updated_at&sort_order=desc" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?sort_by=updated_at&sort_order=desc" | jq '.items'
 ```
 
 ### Search
 ```bash
-curl -s "http://localhost:8000/api/jobs?search=AI%20startup" | jq '.items'
+curl -s "http://localhost:8000/api/v1/jobs?search=AI%20startup" | jq '.items'
 ```
 
 ## Arguments

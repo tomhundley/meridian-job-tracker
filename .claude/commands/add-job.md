@@ -8,12 +8,12 @@ Use the job ingest API to scrape and add a job from a URL.
 
 ## API Endpoint
 
-POST `http://localhost:8000/api/jobs/ingest`
+POST `http://localhost:8000/api/v1/jobs/ingest`
 
 ## Usage
 
 ```bash
-curl -X POST "http://localhost:8000/api/jobs/ingest" \
+curl -X POST "http://localhost:8000/api/v1/jobs/ingest" \
   -H "Content-Type: application/json" \
   -d '{"url": "$ARGUMENTS"}'
 ```

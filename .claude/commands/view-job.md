@@ -8,18 +8,18 @@ Get all information about a job including contacts, status, and analysis.
 
 ## API Endpoint
 
-GET `http://localhost:8000/api/jobs/{job_id}`
+GET `http://localhost:8000/api/v1/jobs/{job_id}`
 
 ## Usage
 
 ```bash
-curl -s "http://localhost:8000/api/jobs/{job_id}" | jq
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}" | jq
 ```
 
 ## Key Fields
 
 ```bash
-curl -s "http://localhost:8000/api/jobs/{job_id}" | jq '{
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}" | jq '{
   title, company, location, status,
   salary_min, salary_max,
   target_role, priority,
@@ -33,7 +33,7 @@ curl -s "http://localhost:8000/api/jobs/{job_id}" | jq '{
 ## View with Description
 
 ```bash
-curl -s "http://localhost:8000/api/jobs/{job_id}" | jq '{title, company, description_raw}'
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}" | jq '{title, company, description_raw}'
 ```
 
 ## Arguments

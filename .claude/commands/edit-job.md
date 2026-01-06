@@ -8,7 +8,7 @@ Modify job fields after creation.
 
 ## API Endpoint
 
-PATCH `http://localhost:8000/api/jobs/{job_id}`
+PATCH `http://localhost:8000/api/v1/jobs/{job_id}`
 
 ## Editable Fields
 
@@ -29,28 +29,28 @@ PATCH `http://localhost:8000/api/jobs/{job_id}`
 
 Update salary:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}" \
   -H "Content-Type: application/json" \
   -d '{"salary_min": 350000, "salary_max": 450000}' | jq
 ```
 
 Update priority and notes:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}" \
   -H "Content-Type: application/json" \
   -d '{"priority": 85, "notes": "Great culture fit, talked to former employee"}' | jq
 ```
 
 Update target role:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}" \
   -H "Content-Type: application/json" \
   -d '{"target_role": "vp"}' | jq
 ```
 
 Set work location type:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}" \
   -H "Content-Type: application/json" \
   -d '{"work_location_type": "remote"}' | jq
 ```

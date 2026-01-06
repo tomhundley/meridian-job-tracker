@@ -11,7 +11,7 @@ After searching LinkedIn with the browser, save discovered jobs to the database.
 ### Step 1: Generate Search URL
 
 ```bash
-curl -s -X POST "http://localhost:8000/api/discovery/linkedin/search-url" \
+curl -s -X POST "http://localhost:8000/api/v1/discovery/linkedin/search-url" \
   -H "Content-Type: application/json" \
   -d '{
     "keywords": "VP Engineering",
@@ -30,7 +30,7 @@ Use Playwright to navigate to the search URL and extract job listings.
 ### Step 3: Save Discovered Jobs
 
 ```bash
-curl -s -X POST "http://localhost:8000/api/discovery/linkedin/save" \
+curl -s -X POST "http://localhost:8000/api/v1/discovery/linkedin/save" \
   -H "Content-Type: application/json" \
   -d '{
     "auto_dedupe": true,

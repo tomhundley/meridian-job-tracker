@@ -9,7 +9,7 @@ Use Playwright browser automation to search LinkedIn for jobs matching your crit
 ## Step 1: Generate Search URL
 
 ```bash
-curl -s -X POST "http://localhost:8000/api/discovery/linkedin/search-url" \
+curl -s -X POST "http://localhost:8000/api/v1/discovery/linkedin/search-url" \
   -H "Content-Type: application/json" \
   -d '{
     "keywords": "$ARGUMENTS",
@@ -60,7 +60,7 @@ AI-focused roles:
 
 After extracting jobs from Playwright, save them:
 ```bash
-curl -s -X POST "http://localhost:8000/api/discovery/linkedin/save" \
+curl -s -X POST "http://localhost:8000/api/v1/discovery/linkedin/save" \
   -H "Content-Type: application/json" \
   -d '{
     "auto_dedupe": true,

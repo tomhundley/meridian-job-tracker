@@ -8,12 +8,12 @@ Generate an AI-powered cover letter tailored to the job description and target r
 
 ## API Endpoint
 
-POST `http://localhost:8000/api/jobs/{job_id}/cover-letter`
+POST `http://localhost:8000/api/v1/jobs/{job_id}/cover-letter`
 
 ## Usage
 
 ```bash
-curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/cover-letter" \
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{job_id}/cover-letter" \
   -H "Content-Type: application/json" \
   -d '{
     "target_role": "vp"
@@ -23,7 +23,7 @@ curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/cover-letter" \
 ## With Custom Instructions
 
 ```bash
-curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/cover-letter" \
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{job_id}/cover-letter" \
   -H "Content-Type: application/json" \
   -d '{
     "target_role": "cto",
@@ -42,7 +42,7 @@ curl -s -X POST "http://localhost:8000/api/jobs/{job_id}/cover-letter" \
 ## List Cover Letters for Job
 
 ```bash
-curl -s "http://localhost:8000/api/jobs/{job_id}/cover-letters" | jq
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}/cover-letters" | jq
 ```
 
 ## Response Fields

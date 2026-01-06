@@ -8,12 +8,12 @@ Remove a job from active tracking (soft delete - can be recovered).
 
 ## API Endpoint
 
-DELETE `http://localhost:8000/api/jobs/{job_id}`
+DELETE `http://localhost:8000/api/v1/jobs/{job_id}`
 
 ## Usage
 
 ```bash
-curl -s -X DELETE "http://localhost:8000/api/jobs/{job_id}"
+curl -s -X DELETE "http://localhost:8000/api/v1/jobs/{job_id}"
 ```
 
 ## Notes
@@ -26,7 +26,7 @@ curl -s -X DELETE "http://localhost:8000/api/jobs/{job_id}"
 
 If you want to keep the job record but remove from active tracking:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}/status" \
   -H "Content-Type: application/json" \
   -d '{"status": "archived"}' | jq
 ```

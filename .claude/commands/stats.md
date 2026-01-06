@@ -8,12 +8,12 @@ View aggregate statistics about your job search progress.
 
 ## API Endpoint
 
-GET `http://localhost:8000/api/discovery/stats`
+GET `http://localhost:8000/api/v1/discovery/stats`
 
 ## Usage
 
 ```bash
-curl -s "http://localhost:8000/api/discovery/stats" | jq
+curl -s "http://localhost:8000/api/v1/discovery/stats" | jq
 ```
 
 ## Response Fields

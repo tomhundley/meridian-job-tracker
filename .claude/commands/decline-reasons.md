@@ -10,21 +10,21 @@ Track why jobs didn't work out - either you declined or the company declined.
 
 Reasons for when YOU decline/withdraw:
 ```bash
-curl -s "http://localhost:8000/api/decline-reasons/user" | jq
+curl -s "http://localhost:8000/api/v1/decline-reasons/user" | jq
 ```
 
 ## List Company Decline Reasons
 
 Reasons for when the COMPANY rejects you:
 ```bash
-curl -s "http://localhost:8000/api/decline-reasons/company" | jq
+curl -s "http://localhost:8000/api/v1/decline-reasons/company" | jq
 ```
 
 ## Apply Decline Reasons
 
 When marking a job as rejected:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}/status" \
   -H "Content-Type: application/json" \
   -d '{
     "status": "rejected",
@@ -35,7 +35,7 @@ curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
 
 When withdrawing:
 ```bash
-curl -s -X PATCH "http://localhost:8000/api/jobs/{job_id}/status" \
+curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{job_id}/status" \
   -H "Content-Type: application/json" \
   -d '{
     "status": "withdrawn",

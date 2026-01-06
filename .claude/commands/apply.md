@@ -34,13 +34,13 @@ cd backend && python -m src.cli apply {job_id} --dry-run
 ## Check if Job is Easy Apply
 
 ```bash
-curl -s "http://localhost:8000/api/jobs/{job_id}" | jq '.is_easy_apply'
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}" | jq '.is_easy_apply'
 ```
 
 ## Filter Easy Apply Jobs
 
 ```bash
-curl -s "http://localhost:8000/api/jobs?is_easy_apply=true" | jq '.items[] | {title, company, url}'
+curl -s "http://localhost:8000/api/v1/jobs?is_easy_apply=true" | jq '.items[] | {title, company, url}'
 ```
 
 ## Arguments
