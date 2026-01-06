@@ -29,6 +29,13 @@ class ScrapedJob:
     source_id: str | None
     raw_html: str
     is_easy_apply: bool = False
+    # Enhanced fields from JSON-LD
+    salary_min: int | None = None
+    salary_max: int | None = None
+    salary_currency: str | None = None
+    employment_type: str | None = None  # full_time, part_time, contract, etc.
+    work_location_type: str | None = None  # remote, hybrid, on_site
+    posted_at: str | None = None  # ISO date string
 
 
 SUPPORTED_SOURCES = {"linkedin", "indeed", "greenhouse", "lever", "workday"}
@@ -106,6 +113,118 @@ def _extract_location(job_posting: dict[str, Any]) -> str | None:
             return _clean_text(", ".join([part for part in parts if part]))
         if isinstance(address, str):
             return _clean_text(address)
+    return None
+
+
+def _extract_salary(job_posting: dict[str, Any]) -> tuple[int | None, int | None, str | None]:
+    """Extract salary information from JSON-LD JobPosting."""
+    base_salary = job_posting.get("baseSalary")
+    if not base_salary:
+        return None, None, None
+
+    currency = None
+    min_val = None
+    max_val = None
+
+    if isinstance(base_salary, dict):
+        currency = base_salary.get("currency")
+        value = base_salary.get("value")
+
+        if isinstance(value, dict):
+            # Range format: {"minValue": X, "maxValue": Y}
+            min_val = value.get("minValue")
+            max_val = value.get("maxValue")
+            # Single value format: {"value": X}
+            if min_val is None and max_val is None:
+                single_val = value.get("value")
+                if single_val:
+                    min_val = max_val = single_val
+        elif isinstance(value, (int, float)):
+            min_val = max_val = value
+
+    # Convert to int if present
+    if min_val is not None:
+        try:
+            min_val = int(float(min_val))
+        except (ValueError, TypeError):
+            min_val = None
+    if max_val is not None:
+        try:
+            max_val = int(float(max_val))
+        except (ValueError, TypeError):
+            max_val = None
+
+    return min_val, max_val, currency
+
+
+def _extract_employment_type(job_posting: dict[str, Any]) -> str | None:
+    """Extract employment type from JSON-LD and normalize to our enum values."""
+    emp_type = job_posting.get("employmentType")
+    if not emp_type:
+        return None
+
+    # Handle array of types
+    if isinstance(emp_type, list):
+        emp_type = emp_type[0] if emp_type else None
+
+    if not emp_type:
+        return None
+
+    # Normalize to our enum values
+    emp_type_lower = str(emp_type).lower().replace("-", "_").replace(" ", "_")
+
+    type_mapping = {
+        "full_time": "full_time",
+        "fulltime": "full_time",
+        "part_time": "part_time",
+        "parttime": "part_time",
+        "contract": "contract",
+        "contractor": "contract",
+        "temporary": "temporary",
+        "temp": "temporary",
+        "intern": "internship",
+        "internship": "internship",
+    }
+
+    return type_mapping.get(emp_type_lower)
+
+
+def _extract_work_location_type(job_posting: dict[str, Any]) -> str | None:
+    """Extract work location type (remote/hybrid/on_site) from JSON-LD."""
+    # Check jobLocationType field (LinkedIn uses this)
+    location_type = job_posting.get("jobLocationType")
+    if location_type:
+        if isinstance(location_type, list):
+            location_type = location_type[0] if location_type else None
+        if location_type:
+            lt_lower = str(location_type).lower()
+            if "telecommute" in lt_lower or "remote" in lt_lower:
+                return "remote"
+
+    # Check applicantLocationRequirements
+    loc_req = job_posting.get("applicantLocationRequirements")
+    if loc_req:
+        if isinstance(loc_req, list):
+            # Multiple locations often means hybrid or flexible
+            return "hybrid"
+
+    # Check description for keywords
+    description = job_posting.get("description", "")
+    if isinstance(description, str):
+        desc_lower = description.lower()
+        if "fully remote" in desc_lower or "100% remote" in desc_lower:
+            return "remote"
+        if "hybrid" in desc_lower:
+            return "hybrid"
+
+    return None
+
+
+def _extract_posted_date(job_posting: dict[str, Any]) -> str | None:
+    """Extract posting date from JSON-LD."""
+    date_posted = job_posting.get("datePosted")
+    if date_posted and isinstance(date_posted, str):
+        return date_posted
     return None
 
 
@@ -345,6 +464,20 @@ class JobScraper:
         if resolved_source == "linkedin":
             is_easy_apply = _detect_linkedin_easy_apply(soup)
 
+        # Extract enhanced fields from JSON-LD
+        salary_min = None
+        salary_max = None
+        salary_currency = None
+        employment_type = None
+        work_location_type = None
+        posted_at = None
+
+        if job_posting:
+            salary_min, salary_max, salary_currency = _extract_salary(job_posting)
+            employment_type = _extract_employment_type(job_posting)
+            work_location_type = _extract_work_location_type(job_posting)
+            posted_at = _extract_posted_date(job_posting)
+
         return ScrapedJob(
             title=title,
             company=company,
@@ -354,6 +487,12 @@ class JobScraper:
             source_id=extract_source_id(url, resolved_source),
             raw_html=html,
             is_easy_apply=is_easy_apply,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            salary_currency=salary_currency,
+            employment_type=employment_type,
+            work_location_type=work_location_type,
+            posted_at=posted_at,
         )
 
     async def scrape(self, url: str, source: str | None = None) -> ScrapedJob:

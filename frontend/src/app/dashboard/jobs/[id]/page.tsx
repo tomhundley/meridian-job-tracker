@@ -45,6 +45,7 @@ interface Job {
   priority: number;
   notes: string | null;
   tags: string[];
+  posted_at: string | null;
   applied_at: string | null;
   created_at: string;
   updated_at: string;
@@ -55,6 +56,14 @@ interface Job {
   user_decline_reasons: string[] | null;
   company_decline_reasons: string[] | null;
   decline_notes: string | null;
+}
+
+function formatPostedAge(postedAt: string | null): string {
+  if (!postedAt) return "-";
+  const days = Math.floor((Date.now() - new Date(postedAt).getTime()) / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
 }
 
 interface CoverLetter {
@@ -537,6 +546,15 @@ export default function JobDetailPage() {
           <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
             <h2 className="text-lg font-semibold mb-4">Timeline</h2>
             <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock size={16} className="text-[var(--color-text-tertiary)]" />
+                <span className="text-[var(--color-text-tertiary)]">Posted:</span>
+                <span>
+                  {job.posted_at
+                    ? `${new Date(job.posted_at).toLocaleDateString()} (${formatPostedAge(job.posted_at)})`
+                    : "-"}
+                </span>
+              </div>
               <div className="flex items-center gap-2 text-sm">
                 <Clock size={16} className="text-[var(--color-text-tertiary)]" />
                 <span className="text-[var(--color-text-tertiary)]">Added:</span>

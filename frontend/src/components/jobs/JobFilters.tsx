@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, MapPin, TrendingUp, DollarSign, Filter, CircleDot, Zap, Star, Target, Sparkles } from "lucide-react";
+import { Search, MapPin, TrendingUp, DollarSign, Filter, CircleDot, Zap, Star, Target, Sparkles, Calendar, RefreshCw } from "lucide-react";
 
 const statuses = [
   { value: "", label: "Any" },
@@ -34,6 +34,15 @@ const salaryRanges = [
   { label: "$150k+", minSalary: 150000 },
   { label: "$200k+", minSalary: 200000 },
   { label: "$250k+", minSalary: 250000 },
+];
+
+// Posting age presets (in days)
+const agePresets = [
+  { label: "Any", maxDays: 0 },
+  { label: "≤7d", maxDays: 7 },
+  { label: "≤14d", maxDays: 14 },
+  { label: "≤30d", maxDays: 30 },
+  { label: "≤60d", maxDays: 60 },
 ];
 
 // Easy Apply filter options
@@ -74,6 +83,7 @@ interface JobFiltersProps {
   isAiForward: string;
   minPriority: number;
   minSalary: number;
+  maxAgeDays: number;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onWorkLocationTypeChange: (value: string) => void;
@@ -83,6 +93,8 @@ interface JobFiltersProps {
   onIsAiForwardChange: (value: string) => void;
   onMinPriorityChange: (value: number) => void;
   onMinSalaryChange: (value: number) => void;
+  onMaxAgeDaysChange: (value: number) => void;
+  onRefresh?: () => void;
 }
 
 interface SegmentedControlProps {
@@ -91,16 +103,18 @@ interface SegmentedControlProps {
   options: { label: string; value: string | number }[];
   value: string | number;
   onChange: (value: string | number) => void;
+  accentColor?: string;
 }
 
-function SegmentedControl({ icon, label, options, value, onChange }: SegmentedControlProps) {
+function SegmentedControl({ icon, label, options, value, onChange, accentColor }: SegmentedControlProps) {
+  const colorClass = accentColor || "text-[var(--color-text-tertiary)]";
   return (
     <div
       className="flex items-center gap-2.5 px-3 py-2 rounded-lg backdrop-blur-sm border border-white/10"
       style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}
     >
-      {icon && <span className="text-[var(--color-text-tertiary)]">{icon}</span>}
-      <span className="text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wide">
+      {icon && <span className={colorClass}>{icon}</span>}
+      <span className={`text-xs font-medium uppercase tracking-wide ${colorClass}`}>
         {label}
       </span>
       <div className="flex bg-[var(--color-bg-tertiary)] rounded-md p-0.5">
@@ -132,6 +146,7 @@ export function JobFilters({
   isAiForward,
   minPriority,
   minSalary,
+  maxAgeDays,
   onSearchChange,
   onStatusChange,
   onWorkLocationTypeChange,
@@ -141,9 +156,11 @@ export function JobFilters({
   onIsAiForwardChange,
   onMinPriorityChange,
   onMinSalaryChange,
+  onMaxAgeDaysChange,
+  onRefresh,
 }: JobFiltersProps) {
   // Check if any filters are active
-  const hasActiveFilters = status || workLocationType || isEasyApply || isFavorite || isPerfectFit || isAiForward || minPriority > 0 || minSalary > 0;
+  const hasActiveFilters = status || workLocationType || isEasyApply || isFavorite || isPerfectFit || isAiForward || minPriority > 0 || minSalary > 0 || maxAgeDays > 0;
 
   const clearAllFilters = () => {
     onStatusChange("");
@@ -154,6 +171,7 @@ export function JobFilters({
     onIsAiForwardChange("");
     onMinPriorityChange(0);
     onMinSalaryChange(0);
+    onMaxAgeDaysChange(0);
   };
 
   return (
@@ -174,6 +192,17 @@ export function JobFilters({
           />
         </div>
 
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] rounded-lg transition-all border border-[var(--color-border-subtle)]"
+            title="Refresh jobs"
+          >
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+        )}
+
         {hasActiveFilters && (
           <button
             onClick={clearAllFilters}
@@ -192,6 +221,7 @@ export function JobFilters({
           options={statuses.map((s) => ({ label: s.label, value: s.value }))}
           value={status}
           onChange={(v) => onStatusChange(v as string)}
+          accentColor="text-blue-400"
         />
 
         <SegmentedControl
@@ -200,6 +230,7 @@ export function JobFilters({
           options={locationTypes.map((l) => ({ label: l.label, value: l.value }))}
           value={workLocationType}
           onChange={(v) => onWorkLocationTypeChange(v as string)}
+          accentColor="text-orange-400"
         />
 
         <SegmentedControl
@@ -208,6 +239,7 @@ export function JobFilters({
           options={easyApplyOptions.map((e) => ({ label: e.label, value: e.value }))}
           value={isEasyApply}
           onChange={(v) => onIsEasyApplyChange(v as string)}
+          accentColor="text-green-400"
         />
 
         <SegmentedControl
@@ -216,6 +248,7 @@ export function JobFilters({
           options={favoriteOptions.map((f) => ({ label: f.label, value: f.value }))}
           value={isFavorite}
           onChange={(v) => onIsFavoriteChange(v as string)}
+          accentColor="text-yellow-400"
         />
 
         <SegmentedControl
@@ -224,6 +257,7 @@ export function JobFilters({
           options={perfectFitOptions.map((p) => ({ label: p.label, value: p.value }))}
           value={isPerfectFit}
           onChange={(v) => onIsPerfectFitChange(v as string)}
+          accentColor="text-purple-400"
         />
 
         <SegmentedControl
@@ -232,6 +266,7 @@ export function JobFilters({
           options={aiForwardOptions.map((a) => ({ label: a.label, value: a.value }))}
           value={isAiForward}
           onChange={(v) => onIsAiForwardChange(v as string)}
+          accentColor="text-cyan-400"
         />
 
         <SegmentedControl
@@ -240,6 +275,7 @@ export function JobFilters({
           options={priorityLevels.map((p) => ({ label: p.label, value: p.minPriority }))}
           value={minPriority}
           onChange={(v) => onMinPriorityChange(v as number)}
+          accentColor="text-emerald-400"
         />
 
         <SegmentedControl
@@ -248,6 +284,16 @@ export function JobFilters({
           options={salaryRanges.map((s) => ({ label: s.label, value: s.minSalary }))}
           value={minSalary}
           onChange={(v) => onMinSalaryChange(v as number)}
+          accentColor="text-lime-400"
+        />
+
+        <SegmentedControl
+          icon={<Calendar size={14} />}
+          label="Posted"
+          options={agePresets.map((a) => ({ label: a.label, value: a.maxDays }))}
+          value={maxAgeDays}
+          onChange={(v) => onMaxAgeDaysChange(v as number)}
+          accentColor="text-amber-400"
         />
       </div>
     </div>

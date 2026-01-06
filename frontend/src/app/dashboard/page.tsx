@@ -15,12 +15,18 @@ export default function DashboardPage() {
   const [isAiForward, setIsAiForward] = useState("");
   const [minPriority, setMinPriority] = useState(0);
   const [minSalary, setMinSalary] = useState(0);
+  const [maxAgeDays, setMaxAgeDays] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [sortBy, setSortBy] = useState<SortField>("updated_at");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   const handleSortChange = (field: SortField, order: SortOrder) => {
     setSortBy(field);
     setSortOrder(order);
+  };
+
+  const handleRefresh = () => {
+    setRefreshKey((prev) => prev + 1);
   };
 
   return (
@@ -46,6 +52,7 @@ export default function DashboardPage() {
         isAiForward={isAiForward}
         minPriority={minPriority}
         minSalary={minSalary}
+        maxAgeDays={maxAgeDays}
         onSearchChange={setSearch}
         onStatusChange={setStatus}
         onWorkLocationTypeChange={setWorkLocationType}
@@ -55,6 +62,8 @@ export default function DashboardPage() {
         onIsAiForwardChange={setIsAiForward}
         onMinPriorityChange={setMinPriority}
         onMinSalaryChange={setMinSalary}
+        onMaxAgeDaysChange={setMaxAgeDays}
+        onRefresh={handleRefresh}
       />
       <JobsTable
         search={search}
@@ -66,6 +75,8 @@ export default function DashboardPage() {
         isAiForward={isAiForward === "true" ? true : isAiForward === "false" ? false : undefined}
         minPriority={minPriority}
         minSalary={minSalary}
+        maxAgeDays={maxAgeDays || undefined}
+        refreshKey={refreshKey}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}

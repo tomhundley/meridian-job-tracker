@@ -1,6 +1,6 @@
 """Job CRUD endpoints."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -22,12 +22,13 @@ from src.schemas import (
     JobStatusUpdate,
     JobUpdate,
     JobStatus,
+    JobAnalysisResponse,
     RoleType,
     WorkLocationType,
     CoverLetterCreate,
     CoverLetterResponse,
 )
-from src.services import job_scraper, JobScrapeError
+from src.services import job_scraper, JobScrapeError, analyze_job
 
 router = APIRouter()
 
@@ -102,6 +103,7 @@ async def list_jobs(
     search: str | None = None,
     sort_by: Annotated[str | None, Query(description="Sort field: updated_at, created_at, priority, salary")] = "updated_at",
     sort_order: Annotated[str | None, Query(description="Sort order: asc or desc")] = "desc",
+    max_age_days: Annotated[int | None, Query(ge=1, description="Maximum posting age in days")] = None,
 ) -> JobListResponse:
     """List all jobs with optional filters and pagination."""
     # Base query - exclude deleted
@@ -144,6 +146,10 @@ async def list_jobs(
             | Job.description_raw.ilike(f"%{search}%")
         )
         query = query.where(search_filter)
+    if max_age_days is not None:
+        # Filter by posting age - include jobs with NULL posted_at (they pass the filter)
+        cutoff_date = datetime.utcnow() - timedelta(days=max_age_days)
+        query = query.where((Job.posted_at.is_(None)) | (Job.posted_at >= cutoff_date))
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
@@ -206,13 +212,24 @@ async def list_jobs(
     status_code=status.HTTP_201_CREATED,
     summary="Ingest job from URL",
     description=(
-        "Automatically scrape and parse job details from supported job board URLs.\n\n"
+        "Automatically scrape, parse, and analyze job details from supported URLs.\n\n"
         "**Supported Sources:**\n"
         "- LinkedIn: `linkedin.com/jobs/view/*`\n"
         "- Indeed: `indeed.com/viewjob*`\n"
         "- Greenhouse: `boards.greenhouse.io/*`\n"
         "- Lever: `jobs.lever.co/*`\n"
-        "- Workday: `*.myworkdayjobs.com/*`\n"
+        "- Workday: `*.myworkdayjobs.com/*`\n\n"
+        "**Auto-Extracted Data:**\n"
+        "- Title, company, location, description\n"
+        "- Salary range (if available)\n"
+        "- Employment type (full-time, contract, etc.)\n"
+        "- Work location type (remote, hybrid, on-site)\n"
+        "- Posted date\n"
+        "- Easy Apply status (LinkedIn)\n\n"
+        "**Auto-Analysis:**\n"
+        "- Priority/fit score (0-100)\n"
+        "- AI-forward company detection\n"
+        "- Target role suggestion (CTO, VP, Director, etc.)\n"
     ),
     responses={
         201: {"description": "Job created successfully"},
@@ -253,6 +270,31 @@ async def ingest_job(
             detail="Job already exists",
         )
 
+    # Parse posted_at date if available
+    posted_at = None
+    if scraped.posted_at:
+        try:
+            from datetime import datetime
+            posted_at = datetime.fromisoformat(scraped.posted_at.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+
+    # Map employment type string to enum
+    employment_type = None
+    if scraped.employment_type:
+        try:
+            employment_type = ModelEmploymentType(scraped.employment_type)
+        except ValueError:
+            pass
+
+    # Map work location type string to enum
+    work_location_type = None
+    if scraped.work_location_type:
+        try:
+            work_location_type = ModelWorkLocationType(scraped.work_location_type)
+        except ValueError:
+            pass
+
     job = Job(
         title=scraped.title,
         company=scraped.company,
@@ -263,8 +305,30 @@ async def ingest_job(
         description_raw=scraped.description,
         source_html=scraped.raw_html,
         is_easy_apply=scraped.is_easy_apply,
+        salary_min=scraped.salary_min,
+        salary_max=scraped.salary_max,
+        salary_currency=scraped.salary_currency or "USD",
+        employment_type=employment_type,
+        work_location_type=work_location_type,
+        posted_at=posted_at,
         notes=request.notes,
     )
+
+    # Run job analysis to set priority, is_ai_forward, and target_role
+    if scraped.description:
+        try:
+            analysis = analyze_job(
+                description=scraped.description,
+                title=scraped.title,
+                company=scraped.company,
+            )
+            job.priority = analysis.suggested_priority
+            job.is_ai_forward = analysis.is_ai_forward
+            if analysis.suggested_role:
+                job.target_role = analysis.suggested_role
+        except Exception:
+            pass  # Don't fail ingestion if analysis fails
+
     db.add(job)
     await db.flush()
     await db.refresh(job)
@@ -313,6 +377,30 @@ async def bulk_ingest_jobs(
             failed.append({"url": url, "error": "Job already exists"})
             continue
 
+        # Parse posted_at date if available
+        posted_at = None
+        if scraped.posted_at:
+            try:
+                posted_at = datetime.fromisoformat(scraped.posted_at.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+
+        # Map employment type string to enum
+        employment_type = None
+        if scraped.employment_type:
+            try:
+                employment_type = ModelEmploymentType(scraped.employment_type)
+            except ValueError:
+                pass
+
+        # Map work location type string to enum
+        work_location_type = None
+        if scraped.work_location_type:
+            try:
+                work_location_type = ModelWorkLocationType(scraped.work_location_type)
+            except ValueError:
+                pass
+
         job = Job(
             title=scraped.title,
             company=scraped.company,
@@ -323,8 +411,30 @@ async def bulk_ingest_jobs(
             description_raw=scraped.description,
             source_html=scraped.raw_html,
             is_easy_apply=scraped.is_easy_apply,
+            salary_min=scraped.salary_min,
+            salary_max=scraped.salary_max,
+            salary_currency=scraped.salary_currency or "USD",
+            employment_type=employment_type,
+            work_location_type=work_location_type,
+            posted_at=posted_at,
             notes=job_request.notes,
         )
+
+        # Run job analysis to set priority, is_ai_forward, and target_role
+        if scraped.description:
+            try:
+                analysis = analyze_job(
+                    description=scraped.description,
+                    title=scraped.title,
+                    company=scraped.company,
+                )
+                job.priority = analysis.suggested_priority
+                job.is_ai_forward = analysis.is_ai_forward
+                if analysis.suggested_role:
+                    job.target_role = analysis.suggested_role
+            except Exception:
+                pass  # Don't fail ingestion if analysis fails
+
         db.add(job)
         await db.flush()
         created.append(job)
@@ -579,6 +689,71 @@ async def update_job_status(
 
     # Build response with contacts (contacts are eagerly loaded)
     return build_job_response(job, contacts=list(job.contacts))
+
+
+@router.post(
+    "/{job_id}/analyze",
+    response_model=JobAnalysisResponse,
+    summary="Analyze job fit",
+    description=(
+        "Analyze a job to determine AI-forward status, fit score, and role suggestions.\n\n"
+        "Returns:\n"
+        "- **is_ai_forward**: Whether this is an AI-forward company/role\n"
+        "- **ai_confidence**: Confidence score (0-1) for AI-forward detection\n"
+        "- **suggested_priority**: Fit score (0-100) based on skills match\n"
+        "- **suggested_role**: Recommended target role (CTO, VP, Director, etc.)\n"
+        "- **technologies_matched/missing**: Tech requirements vs resume skills\n"
+    ),
+    dependencies=[Depends(require_permissions(["jobs:read"]))],
+)
+async def analyze_job_fit(
+    db: DbSession,
+    job_id: UUID,
+    apply_suggestions: Annotated[bool, Query(description="Apply suggested priority and is_ai_forward to job")] = False,
+) -> JobAnalysisResponse:
+    """Analyze a job for fit and AI-forward status."""
+    query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
+    result = await db.execute(query)
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job with id {job_id} not found",
+        )
+
+    if not job.description_raw:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job has no description to analyze",
+        )
+
+    # Run analysis
+    analysis = analyze_job(
+        description=job.description_raw,
+        title=job.title,
+        company=job.company,
+    )
+
+    # Optionally apply suggestions to the job
+    if apply_suggestions:
+        job.priority = analysis.suggested_priority
+        job.is_ai_forward = analysis.is_ai_forward
+        if analysis.suggested_role:
+            job.target_role = ModelRoleType(analysis.suggested_role.value)
+        await db.flush()
+
+    return JobAnalysisResponse(
+        is_ai_forward=analysis.is_ai_forward,
+        ai_confidence=analysis.ai_confidence,
+        suggested_priority=analysis.suggested_priority,
+        suggested_role=RoleType(analysis.suggested_role.value) if analysis.suggested_role else None,
+        technologies_matched=analysis.technologies_matched,
+        technologies_missing=analysis.technologies_missing,
+        years_experience_required=analysis.years_experience_required,
+        seniority_level=analysis.seniority_level,
+        analysis_notes=analysis.analysis_notes,
+    )
 
 
 @router.delete(

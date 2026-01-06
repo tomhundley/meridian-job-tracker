@@ -208,3 +208,17 @@ class JobListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class JobAnalysisResponse(BaseModel):
+    """Schema for job analysis result."""
+
+    is_ai_forward: bool = Field(..., description="Whether this is an AI-forward company/role")
+    ai_confidence: float = Field(..., ge=0, le=1, description="Confidence score for AI-forward detection")
+    suggested_priority: int = Field(..., ge=0, le=100, description="Suggested priority/fit score")
+    suggested_role: RoleType | None = Field(None, description="Suggested target role based on job")
+    technologies_matched: list[str] = Field(default_factory=list, description="Technologies that match resume")
+    technologies_missing: list[str] = Field(default_factory=list, description="Required technologies not in resume")
+    years_experience_required: int | None = Field(None, description="Years of experience required")
+    seniority_level: str | None = Field(None, description="Detected seniority level")
+    analysis_notes: list[str] = Field(default_factory=list, description="Analysis notes and observations")

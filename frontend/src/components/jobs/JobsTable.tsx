@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { ChevronUp, ChevronDown, ChevronsUpDown, User } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, User, Zap, Target, Sparkles } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -18,6 +19,7 @@ interface Job {
   created_at: string;
   updated_at: string;
   applied_at: string | null;
+  posted_at: string | null;
   salary_min: number | null;
   salary_max: number | null;
   salary_currency: string | null;
@@ -43,6 +45,8 @@ interface JobsTableProps {
   minPriority?: number;
   minSalary?: number;
   maxSalary?: number;
+  maxAgeDays?: number;
+  refreshKey?: number;
   sortBy?: SortField;
   sortOrder?: SortOrder;
   onSortChange?: (field: SortField, order: SortOrder) => void;
@@ -85,6 +89,19 @@ function getPriorityLabel(priority: number): { label: string; color: string } {
   return { label: "-", color: "text-[var(--color-text-tertiary)]" };
 }
 
+function getDaysAgo(postedAt: string | null): { text: string; color: string } {
+  if (!postedAt) {
+    return { text: "-", color: "text-[var(--color-text-tertiary)]" };
+  }
+  const days = Math.floor((Date.now() - new Date(postedAt).getTime()) / 86400000);
+  if (days === 0) return { text: "Today", color: "text-green-400" };
+  if (days === 1) return { text: "1d", color: "text-green-400" };
+  if (days <= 7) return { text: `${days}d`, color: "text-green-400" };
+  if (days <= 14) return { text: `${days}d`, color: "text-yellow-400" };
+  if (days <= 30) return { text: `${days}d`, color: "text-orange-400" };
+  return { text: `${days}d`, color: "text-red-400" };
+}
+
 export function JobsTable({
   search,
   status,
@@ -96,6 +113,8 @@ export function JobsTable({
   minPriority,
   minSalary,
   maxSalary,
+  maxAgeDays,
+  refreshKey,
   sortBy = "updated_at",
   sortOrder = "desc",
   onSortChange,
@@ -112,6 +131,7 @@ export function JobsTable({
   if (minPriority) params.append("min_priority", minPriority.toString());
   if (minSalary) params.append("min_salary", minSalary.toString());
   if (maxSalary) params.append("max_salary", maxSalary.toString());
+  if (maxAgeDays) params.append("max_age_days", maxAgeDays.toString());
   params.append("sort_by", sortBy);
   params.append("sort_order", sortOrder);
   const queryString = params.toString();
@@ -133,7 +153,14 @@ export function JobsTable({
       : <ChevronUp size={14} className="text-[var(--color-accent)]" />;
   };
 
-  const { data, error, isLoading } = useSWR(url, fetcher);
+  const { data, error, isLoading, mutate } = useSWR(url, fetcher);
+
+  // Trigger refresh when refreshKey changes
+  useEffect(() => {
+    if (refreshKey && refreshKey > 0) {
+      mutate();
+    }
+  }, [refreshKey, mutate]);
 
   if (isLoading) {
     return (
@@ -185,6 +212,18 @@ export function JobsTable({
             </th>
             <th className="w-8 px-1 py-3" title="Has contacts">
               <User size={14} className="text-[var(--color-text-tertiary)] opacity-40" />
+            </th>
+            <th className="w-8 px-1 py-3" title="Easy Apply">
+              <Zap size={14} className="text-[var(--color-text-tertiary)] opacity-40" />
+            </th>
+            <th className="w-8 px-1 py-3" title="Perfect Fit">
+              <Target size={14} className="text-[var(--color-text-tertiary)] opacity-40" />
+            </th>
+            <th className="w-8 px-1 py-3" title="AI Forward">
+              <Sparkles size={14} className="text-[var(--color-text-tertiary)] opacity-40" />
+            </th>
+            <th className="text-left px-3 py-3 text-sm font-medium text-[var(--color-text-tertiary)]">
+              Age
             </th>
             <th
               className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
@@ -257,23 +296,8 @@ export function JobsTable({
                     {job.title}
                   </Link>
                   {job.is_favorite && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-yellow-500/20 text-yellow-400" title="Favorite">
+                    <span className="text-yellow-400" title="Favorite">
                       ★
-                    </span>
-                  )}
-                  {job.is_perfect_fit && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/20 text-purple-400 whitespace-nowrap" title="Perfect Fit">
-                      Perfect
-                    </span>
-                  )}
-                  {job.is_ai_forward && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-500/20 text-blue-400 whitespace-nowrap" title="AI Forward">
-                      AI
-                    </span>
-                  )}
-                  {job.is_easy_apply && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-green-500/20 text-green-400 whitespace-nowrap" title="Easy Apply">
-                      Easy
                     </span>
                   )}
                 </div>
@@ -284,6 +308,27 @@ export function JobsTable({
                     <User size={14} className="text-[var(--color-accent)] opacity-70" />
                   </span>
                 )}
+              </td>
+              <td className="px-1 py-3 text-center">
+                {job.is_easy_apply && (
+                  <Zap size={14} className="text-green-400" />
+                )}
+              </td>
+              <td className="px-1 py-3 text-center">
+                {job.is_perfect_fit && (
+                  <Target size={14} className="text-purple-400" />
+                )}
+              </td>
+              <td className="px-1 py-3 text-center">
+                {job.is_ai_forward && (
+                  <Sparkles size={14} className="text-cyan-400" />
+                )}
+              </td>
+              <td className="px-3 py-3 text-sm">
+                {(() => {
+                  const { text, color } = getDaysAgo(job.posted_at);
+                  return <span className={color}>{text}</span>;
+                })()}
               </td>
               <td className="px-4 py-3 text-[var(--color-text-secondary)]">
                 {job.company}
