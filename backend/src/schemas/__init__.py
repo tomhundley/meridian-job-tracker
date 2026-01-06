@@ -6,6 +6,11 @@ from .job import (
     JobResponse,
     JobListResponse,
     JobStatusUpdate,
+    JobIngestRequest,
+    JobBulkIngestRequest,
+    JobBulkIngestResponse,
+    JobBulkStatusUpdate,
+    JobBulkStatusResponse,
     JobStatus,
     RoleType,
     ApplicationMethod,
@@ -19,6 +24,8 @@ from .email import (
     EmailCreate,
     EmailResponse,
 )
+from .agent import AgentCreate, AgentResponse
+from .webhook import WebhookCreate, WebhookResponse
 
 __all__ = [
     # Job schemas
@@ -27,6 +34,11 @@ __all__ = [
     "JobResponse",
     "JobListResponse",
     "JobStatusUpdate",
+    "JobIngestRequest",
+    "JobBulkIngestRequest",
+    "JobBulkIngestResponse",
+    "JobBulkStatusUpdate",
+    "JobBulkStatusResponse",
     "JobStatus",
     "RoleType",
     "ApplicationMethod",
@@ -37,4 +49,10 @@ __all__ = [
     # Email schemas
     "EmailCreate",
     "EmailResponse",
+    # Agent schemas
+    "AgentCreate",
+    "AgentResponse",
+    # Webhook schemas
+    "WebhookCreate",
+    "WebhookResponse",
 ]

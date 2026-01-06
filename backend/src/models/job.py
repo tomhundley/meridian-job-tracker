@@ -102,6 +102,7 @@ class Job(Base):
 
     # Job description
     description_raw: Mapped[str | None] = mapped_column(Text)
+    source_html: Mapped[str | None] = mapped_column(Text)
 
     # Status tracking
     status: Mapped[JobStatus] = mapped_column(

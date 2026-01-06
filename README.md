@@ -19,6 +19,7 @@ A human-in-the-loop job application tracking system with LinkedIn browser automa
 - **AI Cover Letters** - Generate role-specific cover letters with Claude
 - **LinkedIn Automation** - Streamline Easy Apply with human-in-the-loop confirmation
 - **Email Integration** - Link correspondence to job applications
+- **Agent APIs & Webhooks** - Scoped API keys, bulk ingestion, and notifications
 - **Modern Dashboard** - Next.js 15 with real-time updates
 
 ## Architecture
@@ -89,7 +90,7 @@ cp .env.example .env
 python -m src.main
 ```
 
-API available at http://localhost:8000/docs
+API available at http://localhost:8005/docs
 
 ### 4. Start Frontend
 
@@ -101,7 +102,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Dashboard available at http://localhost:3000
+Dashboard available at http://localhost:3005
 
 ## Project Structure
 
@@ -138,11 +139,15 @@ meridian-job-tracker/
 |--------|----------|-------------|
 | GET | `/api/v1/jobs` | List jobs with filters |
 | POST | `/api/v1/jobs` | Create job |
+| POST | `/api/v1/jobs/ingest` | Ingest job from URL |
+| POST | `/api/v1/jobs/bulk` | Bulk ingest jobs |
+| PATCH | `/api/v1/jobs/bulk/status` | Bulk status update |
 | GET | `/api/v1/jobs/{id}` | Get job details |
 | PATCH | `/api/v1/jobs/{id}` | Update job |
 | PATCH | `/api/v1/jobs/{id}/status` | Update status |
 | DELETE | `/api/v1/jobs/{id}` | Soft delete job |
 | POST | `/api/v1/jobs/{id}/cover-letter` | Generate cover letter |
+| GET | `/api/v1/jobs/{id}/cover-letters` | List job cover letters |
 
 ### Cover Letters
 
@@ -158,6 +163,26 @@ meridian-job-tracker/
 | GET | `/api/v1/emails` | List emails |
 | POST | `/api/v1/emails` | Create record |
 | PATCH | `/api/v1/emails/{id}/link/{job_id}` | Link to job |
+
+### Webhooks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/webhooks` | List webhooks |
+| POST | `/api/v1/webhooks` | Register webhook |
+
+### Agents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/agents` | Create agent API key |
+
+## Documentation
+
+- `docs/api-reference.md` - Full API reference
+- `docs/agent-integration.md` - AI agent workflows
+- `docs/mcp-integration.md` - LinkedIn MCP integration
+- `docs/email-agent-workflow.md` - Email agent flow
 
 ## Job Statuses
 
@@ -217,6 +242,7 @@ cd frontend
 npm run dev              # Development server
 npm run build            # Production build
 npm run lint             # Lint
+npm run test             # Component tests
 ```
 
 ## Deployment

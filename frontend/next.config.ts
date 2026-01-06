@@ -1,8 +1,10 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Standalone output for Docker/Vercel
   output: "standalone",
+  outputFileTracingRoot: path.resolve(__dirname, ".."),
 
   // Security headers
   async headers() {

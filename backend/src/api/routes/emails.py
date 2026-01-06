@@ -4,20 +4,25 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from src.api.deps import ApiKey, DbSession
+from src.api.deps import DbSession, require_permissions
 from src.models import Email
 from src.schemas import EmailCreate, EmailResponse
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[EmailResponse])
+@router.get(
+    "",
+    response_model=list[EmailResponse],
+    summary="List emails",
+    description="List emails with optional filters.",
+    dependencies=[Depends(require_permissions(["emails:read"]))],
+)
 async def list_emails(
     db: DbSession,
-    _api_key: ApiKey,
     job_id: UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -34,10 +39,16 @@ async def list_emails(
     return list(result.scalars().all())
 
 
-@router.post("", response_model=EmailResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=EmailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create email",
+    description="Create a new email record.",
+    dependencies=[Depends(require_permissions(["emails:write"]))],
+)
 async def create_email(
     db: DbSession,
-    _api_key: ApiKey,
     email_in: EmailCreate,
 ) -> Email:
     """Create a new email record (typically from email agent)."""
@@ -56,10 +67,15 @@ async def create_email(
     return email
 
 
-@router.get("/{email_id}", response_model=EmailResponse)
+@router.get(
+    "/{email_id}",
+    response_model=EmailResponse,
+    summary="Get email",
+    description="Retrieve an email by ID.",
+    dependencies=[Depends(require_permissions(["emails:read"]))],
+)
 async def get_email(
     db: DbSession,
-    _api_key: ApiKey,
     email_id: UUID,
 ) -> Email:
     """Get an email by ID."""
@@ -76,10 +92,15 @@ async def get_email(
     return email
 
 
-@router.patch("/{email_id}/link/{job_id}", response_model=EmailResponse)
+@router.patch(
+    "/{email_id}/link/{job_id}",
+    response_model=EmailResponse,
+    summary="Link email to job",
+    description="Link an email record to a job.",
+    dependencies=[Depends(require_permissions(["emails:write"]))],
+)
 async def link_email_to_job(
     db: DbSession,
-    _api_key: ApiKey,
     email_id: UUID,
     job_id: UUID,
 ) -> Email:
@@ -100,10 +121,15 @@ async def link_email_to_job(
     return email
 
 
-@router.delete("/{email_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{email_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete email",
+    description="Soft delete an email record.",
+    dependencies=[Depends(require_permissions(["emails:delete"]))],
+)
 async def delete_email(
     db: DbSession,
-    _api_key: ApiKey,
     email_id: UUID,
 ) -> None:
     """Soft delete an email."""

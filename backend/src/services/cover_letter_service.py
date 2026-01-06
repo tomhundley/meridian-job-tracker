@@ -1,6 +1,7 @@
 """Cover letter generation service using Claude API."""
 
 from anthropic import Anthropic
+import structlog
 
 from src.config import settings
 from src.models import CoverLetter, Job
@@ -128,8 +129,18 @@ Generate the cover letter now. Do not include any preamble or explanation - just
 
         Returns dict with content and metadata, ready for creating CoverLetter model.
         """
+        logger = structlog.get_logger(__name__)
+
         if not self.client:
             raise ValueError("Anthropic API key not configured")
+
+        logger.info(
+            "cover_letter_generation_start",
+            job_id=str(job.id),
+            company=job.company,
+            title=job.title,
+            target_role=target_role.value,
+        )
 
         # Analyze job description
         jd_analysis = self.analyze_job(job)
@@ -151,12 +162,20 @@ Generate the cover letter now. Do not include any preamble or explanation - just
 
         content = response.content[0].text
 
-        return {
+        result = {
             "content": content,
             "target_role": target_role,
             "generation_prompt": prompt,
             "model_used": "claude-sonnet-4-20250514",
         }
+
+        logger.info(
+            "cover_letter_generation_success",
+            job_id=str(job.id),
+            target_role=target_role.value,
+        )
+
+        return result
 
     def generate_sync(
         self,

@@ -3,10 +3,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
-from src.api.deps import ApiKey, DbSession
+from src.api.deps import DbSession, require_permissions
 from src.models import CoverLetter, Job
 from src.models.job import RoleType as ModelRoleType
 from src.schemas import CoverLetterApprove, CoverLetterResponse
@@ -14,10 +14,15 @@ from src.schemas import CoverLetterApprove, CoverLetterResponse
 router = APIRouter()
 
 
-@router.get("/{cover_letter_id}", response_model=CoverLetterResponse)
+@router.get(
+    "/{cover_letter_id}",
+    response_model=CoverLetterResponse,
+    summary="Get cover letter",
+    description="Retrieve a cover letter by ID.",
+    dependencies=[Depends(require_permissions(["cover_letters:read"]))],
+)
 async def get_cover_letter(
     db: DbSession,
-    _api_key: ApiKey,
     cover_letter_id: UUID,
 ) -> CoverLetter:
     """Get a cover letter by ID."""
@@ -37,10 +42,15 @@ async def get_cover_letter(
     return cover_letter
 
 
-@router.patch("/{cover_letter_id}/approve", response_model=CoverLetterResponse)
+@router.patch(
+    "/{cover_letter_id}/approve",
+    response_model=CoverLetterResponse,
+    summary="Approve cover letter",
+    description="Approve or unapprove a cover letter.",
+    dependencies=[Depends(require_permissions(["cover_letters:approve"]))],
+)
 async def approve_cover_letter(
     db: DbSession,
-    _api_key: ApiKey,
     cover_letter_id: UUID,
     approval: CoverLetterApprove,
 ) -> CoverLetter:
@@ -66,10 +76,15 @@ async def approve_cover_letter(
     return cover_letter
 
 
-@router.delete("/{cover_letter_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{cover_letter_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete cover letter",
+    description="Soft delete a cover letter.",
+    dependencies=[Depends(require_permissions(["cover_letters:delete"]))],
+)
 async def delete_cover_letter(
     db: DbSession,
-    _api_key: ApiKey,
     cover_letter_id: UUID,
 ) -> None:
     """Soft delete a cover letter."""

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 export default function SettingsPage() {
   const [backendUrl, setBackendUrl] = useState(
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8005"
   );
 
   const handleLogout = () => {

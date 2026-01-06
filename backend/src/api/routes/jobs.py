@@ -4,14 +4,19 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from src.api.deps import ApiKey, DbSession
-from src.models import Job, JobStatus as ModelJobStatus, RoleType as ModelRoleType
+from src.api.deps import DbSession, require_permissions
+from src.models import Job, CoverLetter, JobStatus as ModelJobStatus, RoleType as ModelRoleType
 from src.schemas import (
     JobCreate,
+    JobIngestRequest,
+    JobBulkIngestRequest,
+    JobBulkIngestResponse,
+    JobBulkStatusUpdate,
+    JobBulkStatusResponse,
     JobListResponse,
     JobResponse,
     JobStatusUpdate,
@@ -21,14 +26,20 @@ from src.schemas import (
     CoverLetterCreate,
     CoverLetterResponse,
 )
+from src.services import job_scraper, JobScrapeError
 
 router = APIRouter()
 
 
-@router.get("", response_model=JobListResponse)
+@router.get(
+    "",
+    response_model=JobListResponse,
+    summary="List jobs",
+    description="List all jobs with optional filters and pagination.",
+    dependencies=[Depends(require_permissions(["jobs:read"]))],
+)
 async def list_jobs(
     db: DbSession,
-    _api_key: ApiKey,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     status: JobStatus | None = None,
@@ -81,10 +92,185 @@ async def list_jobs(
     )
 
 
-@router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/ingest",
+    response_model=JobResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ingest job from URL",
+    description=(
+        "Automatically scrape and parse job details from supported job board URLs.\n\n"
+        "**Supported Sources:**\n"
+        "- LinkedIn: `linkedin.com/jobs/view/*`\n"
+        "- Indeed: `indeed.com/viewjob*`\n"
+        "- Greenhouse: `boards.greenhouse.io/*`\n"
+        "- Lever: `jobs.lever.co/*`\n"
+        "- Workday: `*.myworkdayjobs.com/*`\n"
+    ),
+    responses={
+        201: {"description": "Job created successfully"},
+        400: {"description": "Unsupported URL or parsing failed"},
+        409: {"description": "Job already exists (duplicate URL)"},
+    },
+    dependencies=[Depends(require_permissions(["jobs:ingest"]))],
+)
+async def ingest_job(
+    db: DbSession,
+    request: JobIngestRequest,
+) -> Job:
+    """Ingest a job from a URL."""
+    url = str(request.url)
+    try:
+        scraped = await job_scraper.scrape(url, request.source)
+    except JobScrapeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    if scraped.source_id:
+        query = select(Job).where(
+            Job.job_board == scraped.source,
+            Job.job_board_id == scraped.source_id,
+            Job.deleted_at.is_(None),
+        )
+    else:
+        query = select(Job).where(
+            Job.url == url,
+            Job.deleted_at.is_(None),
+        )
+    existing = (await db.execute(query)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Job already exists",
+        )
+
+    job = Job(
+        title=scraped.title,
+        company=scraped.company,
+        location=scraped.location,
+        url=url,
+        job_board=request.source or scraped.source,
+        job_board_id=scraped.source_id,
+        description_raw=scraped.description,
+        source_html=scraped.raw_html,
+        notes=request.notes,
+    )
+    db.add(job)
+    await db.flush()
+    await db.refresh(job)
+    return job
+
+
+@router.post(
+    "/bulk",
+    response_model=JobBulkIngestResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk ingest jobs from URLs",
+    description="Create multiple jobs by scraping their URLs.",
+    dependencies=[Depends(require_permissions(["jobs:ingest"]))],
+)
+async def bulk_ingest_jobs(
+    db: DbSession,
+    request: JobBulkIngestRequest,
+) -> JobBulkIngestResponse:
+    """Bulk ingest jobs from a list of URLs."""
+    created: list[Job] = []
+    failed: list[dict[str, str]] = []
+
+    for job_request in request.jobs:
+        url = str(job_request.url)
+        try:
+            scraped = await job_scraper.scrape(url, job_request.source)
+        except JobScrapeError as exc:
+            failed.append({"url": url, "error": str(exc)})
+            continue
+
+        if scraped.source_id:
+            query = select(Job).where(
+                Job.job_board == scraped.source,
+                Job.job_board_id == scraped.source_id,
+                Job.deleted_at.is_(None),
+            )
+        else:
+            query = select(Job).where(
+                Job.url == url,
+                Job.deleted_at.is_(None),
+            )
+        existing = (await db.execute(query)).scalar_one_or_none()
+        if existing:
+            failed.append({"url": url, "error": "Job already exists"})
+            continue
+
+        job = Job(
+            title=scraped.title,
+            company=scraped.company,
+            location=scraped.location,
+            url=url,
+            job_board=job_request.source or scraped.source,
+            job_board_id=scraped.source_id,
+            description_raw=scraped.description,
+            source_html=scraped.raw_html,
+            notes=job_request.notes,
+        )
+        db.add(job)
+        await db.flush()
+        created.append(job)
+
+    return JobBulkIngestResponse(
+        created=[JobResponse.model_validate(job) for job in created],
+        failed=failed,
+    )
+
+
+@router.patch(
+    "/bulk/status",
+    response_model=JobBulkStatusResponse,
+    summary="Bulk update job status",
+    description="Update status for multiple jobs in a single request.",
+    dependencies=[Depends(require_permissions(["jobs:update_status"]))],
+)
+async def bulk_update_job_status(
+    db: DbSession,
+    status_update: JobBulkStatusUpdate,
+) -> JobBulkStatusResponse:
+    """Update status for multiple jobs."""
+    query = select(Job).where(
+        Job.id.in_(status_update.job_ids),
+        Job.deleted_at.is_(None),
+    )
+    result = await db.execute(query)
+    jobs = list(result.scalars().all())
+    found_ids = {job.id for job in jobs}
+    missing = [job_id for job_id in status_update.job_ids if job_id not in found_ids]
+
+    now = datetime.utcnow()
+    for job in jobs:
+        job.status = ModelJobStatus(status_update.status.value)
+        job.status_changed_at = now
+        if status_update.closed_reason:
+            job.closed_reason = status_update.closed_reason
+        if status_update.status == JobStatus.APPLIED and job.applied_at is None:
+            job.applied_at = now
+
+    await db.flush()
+
+    return JobBulkStatusResponse(
+        updated=[JobResponse.model_validate(job) for job in jobs],
+        missing=missing,
+    )
+
+
+@router.post(
+    "",
+    response_model=JobResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create job",
+    description="Create a new job record.",
+    dependencies=[Depends(require_permissions(["jobs:write"]))],
+)
 async def create_job(
     db: DbSession,
-    _api_key: ApiKey,
     job_in: JobCreate,
 ) -> Job:
     """Create a new job."""
@@ -107,10 +293,15 @@ async def create_job(
     return job
 
 
-@router.get("/{job_id}", response_model=JobResponse)
+@router.get(
+    "/{job_id}",
+    response_model=JobResponse,
+    summary="Get job",
+    description="Retrieve a job by ID.",
+    dependencies=[Depends(require_permissions(["jobs:read"]))],
+)
 async def get_job(
     db: DbSession,
-    _api_key: ApiKey,
     job_id: UUID,
 ) -> Job:
     """Get a job by ID."""
@@ -134,10 +325,15 @@ async def get_job(
     return job
 
 
-@router.patch("/{job_id}", response_model=JobResponse)
+@router.patch(
+    "/{job_id}",
+    response_model=JobResponse,
+    summary="Update job",
+    description="Update job details.",
+    dependencies=[Depends(require_permissions(["jobs:write"]))],
+)
 async def update_job(
     db: DbSession,
-    _api_key: ApiKey,
     job_id: UUID,
     job_in: JobUpdate,
 ) -> Job:
@@ -164,10 +360,15 @@ async def update_job(
     return job
 
 
-@router.patch("/{job_id}/status", response_model=JobResponse)
+@router.patch(
+    "/{job_id}/status",
+    response_model=JobResponse,
+    summary="Update job status",
+    description="Update the status for a job.",
+    dependencies=[Depends(require_permissions(["jobs:update_status"]))],
+)
 async def update_job_status(
     db: DbSession,
-    _api_key: ApiKey,
     job_id: UUID,
     status_update: JobStatusUpdate,
 ) -> Job:
@@ -183,6 +384,7 @@ async def update_job_status(
         )
 
     job.status = ModelJobStatus(status_update.status.value)
+    job.status_changed_at = datetime.utcnow()
     if status_update.closed_reason:
         job.closed_reason = status_update.closed_reason
 
@@ -195,10 +397,15 @@ async def update_job_status(
     return job
 
 
-@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{job_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete job",
+    description="Soft delete a job.",
+    dependencies=[Depends(require_permissions(["jobs:delete"]))],
+)
 async def delete_job(
     db: DbSession,
-    _api_key: ApiKey,
     job_id: UUID,
 ) -> None:
     """Soft delete a job."""
@@ -217,13 +424,19 @@ async def delete_job(
 
 
 # Cover letter generation endpoint
-@router.post("/{job_id}/cover-letter", response_model=CoverLetterResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{job_id}/cover-letter",
+    response_model=CoverLetterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generate cover letter",
+    description="Generate a new cover letter for a job.",
+    dependencies=[Depends(require_permissions(["cover_letters:write"]))],
+)
 async def generate_cover_letter(
     db: DbSession,
-    _api_key: ApiKey,
     job_id: UUID,
     request: CoverLetterCreate,
-) -> CoverLetterModel:
+) -> CoverLetter:
     """Generate a cover letter for a job."""
     from src.models import CoverLetter as CoverLetterModel
     from src.services import cover_letter_service
@@ -285,10 +498,15 @@ async def generate_cover_letter(
     return cover_letter
 
 
-@router.get("/{job_id}/cover-letters", response_model=list[CoverLetterResponse])
+@router.get(
+    "/{job_id}/cover-letters",
+    response_model=list[CoverLetterResponse],
+    summary="List cover letters for job",
+    description="List all cover letters for a job.",
+    dependencies=[Depends(require_permissions(["cover_letters:read"]))],
+)
 async def list_job_cover_letters(
     db: DbSession,
-    _api_key: ApiKey,
     job_id: UUID,
 ) -> list:
     """List all cover letters for a job."""

@@ -15,9 +15,25 @@ const roleTypes = [
   { value: "developer", label: "Developer" },
 ];
 
+const sourceTypes = [
+  { value: "", label: "Auto-detect" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "indeed", label: "Indeed" },
+  { value: "greenhouse", label: "Greenhouse" },
+  { value: "lever", label: "Lever" },
+  { value: "workday", label: "Workday" },
+];
+
 export default function NewJobPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isIngesting, setIsIngesting] = useState(false);
+
+  const [ingestData, setIngestData] = useState({
+    url: "",
+    source: "",
+    notes: "",
+  });
 
   const [formData, setFormData] = useState({
     title: "",
@@ -29,6 +45,44 @@ export default function NewJobPage() {
     priority: 50,
     notes: "",
   });
+
+  const handleIngest = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!ingestData.url) {
+      toast.error("Job URL is required");
+      return;
+    }
+
+    setIsIngesting(true);
+
+    try {
+      const response = await fetch("/api/jobs/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: ingestData.url,
+          source: ingestData.source || null,
+          notes: ingestData.notes || null,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data) {
+        toast.success("Job imported");
+        router.push(`/dashboard/jobs/${data.id}`);
+      } else {
+        const message =
+          data?.detail || data?.error || "Failed to import job";
+        toast.error(message);
+      }
+    } catch (error) {
+      toast.error("Failed to import job");
+    } finally {
+      setIsIngesting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +123,7 @@ export default function NewJobPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/dashboard"
@@ -78,6 +132,85 @@ export default function NewJobPage() {
           <ArrowLeft size={20} />
         </Link>
         <h1 className="text-2xl font-bold">Add New Job</h1>
+      </div>
+
+      <form onSubmit={handleIngest} className="space-y-4">
+        <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Import from URL</h2>
+            <p className="text-sm text-[var(--color-text-tertiary)]">
+              Paste a job posting URL and we will create the job automatically.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
+              Job URL *
+            </label>
+            <input
+              type="url"
+              value={ingestData.url}
+              onChange={(e) => setIngestData({ ...ingestData, url: e.target.value })}
+              className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              placeholder="https://linkedin.com/jobs/view/123456"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
+                Source
+              </label>
+              <select
+                value={ingestData.source}
+                onChange={(e) => setIngestData({ ...ingestData, source: e.target.value })}
+                className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              >
+                {sourceTypes.map((source) => (
+                  <option key={source.value} value={source.value}>
+                    {source.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
+                Notes
+              </label>
+              <input
+                type="text"
+                value={ingestData.notes}
+                onChange={(e) => setIngestData({ ...ingestData, notes: e.target.value })}
+                className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="Referred by John"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={isIngesting}
+            className="px-6 py-2 bg-[var(--color-accent)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {isIngesting ? "Importing..." : "Import Job"}
+          </button>
+          <Link
+            href="/dashboard"
+            className="px-6 py-2 bg-[var(--color-bg-secondary)] rounded-lg hover:bg-[var(--color-bg-elevated)] transition-colors"
+          >
+            Cancel
+          </Link>
+        </div>
+      </form>
+
+      <div className="flex items-center gap-3 text-[var(--color-text-tertiary)] text-sm">
+        <span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
+        Or add manually
+        <span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

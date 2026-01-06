@@ -1,11 +1,24 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8005";
+const LOCAL_DEV_BYPASS =
+  process.env.NODE_ENV !== "production" &&
+  process.env.LOCAL_DEV_BYPASS === "true";
 
 async function getAuthToken() {
   const cookieStore = await cookies();
   return cookieStore.get("auth_token")?.value;
+}
+
+function getAuthHeaders(token: string | undefined) {
+  if (token) {
+    return { "X-API-Key": token };
+  }
+  if (LOCAL_DEV_BYPASS) {
+    return {};
+  }
+  return null;
 }
 
 export async function GET(
@@ -13,7 +26,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const token = await getAuthToken();
-  if (!token) {
+  const authHeaders = getAuthHeaders(token);
+  if (!authHeaders) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -22,7 +36,7 @@ export async function GET(
   try {
     const response = await fetch(`${BACKEND_URL}/api/v1/jobs/${id}`, {
       headers: {
-        "X-API-Key": token,
+        ...authHeaders,
       },
     });
 
@@ -42,7 +56,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const token = await getAuthToken();
-  if (!token) {
+  const authHeaders = getAuthHeaders(token);
+  if (!authHeaders) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -53,7 +68,7 @@ export async function PATCH(
     const response = await fetch(`${BACKEND_URL}/api/v1/jobs/${id}`, {
       method: "PATCH",
       headers: {
-        "X-API-Key": token,
+        ...authHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
@@ -75,7 +90,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const token = await getAuthToken();
-  if (!token) {
+  const authHeaders = getAuthHeaders(token);
+  if (!authHeaders) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -85,7 +101,7 @@ export async function DELETE(
     const response = await fetch(`${BACKEND_URL}/api/v1/jobs/${id}`, {
       method: "DELETE",
       headers: {
-        "X-API-Key": token,
+        ...authHeaders,
       },
     });
 

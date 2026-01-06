@@ -52,6 +52,7 @@ CREATE TABLE jobs (
 
     -- Job description
     description_raw TEXT,
+    source_html TEXT,
 
     -- Status tracking
     status job_status NOT NULL DEFAULT 'saved',
@@ -152,6 +153,30 @@ CREATE TABLE application_attempts (
     confirmed_by VARCHAR(100)
 );
 
+-- Agents table (API keys with permissions)
+CREATE TABLE agents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    name VARCHAR(200) NOT NULL UNIQUE,
+    api_key VARCHAR(255) NOT NULL UNIQUE,
+    permissions TEXT[] NOT NULL DEFAULT '{}',
+    is_active BOOLEAN NOT NULL DEFAULT true
+);
+
+-- Webhooks table
+CREATE TABLE webhooks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    url TEXT NOT NULL,
+    events TEXT[] NOT NULL DEFAULT '{}',
+    secret VARCHAR(255),
+    is_active BOOLEAN NOT NULL DEFAULT true
+);
+
 -- Indexes
 CREATE INDEX idx_jobs_status ON jobs(status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_jobs_company ON jobs(company) WHERE deleted_at IS NULL;
@@ -168,6 +193,9 @@ CREATE INDEX idx_emails_timestamp ON emails(email_timestamp DESC);
 
 CREATE INDEX idx_application_attempts_job_id ON application_attempts(job_id);
 CREATE INDEX idx_application_attempts_pending ON application_attempts(job_id) WHERE requires_confirmation = true AND confirmed_at IS NULL;
+
+CREATE INDEX idx_agents_api_key ON agents(api_key);
+CREATE INDEX idx_webhooks_active ON webhooks(is_active) WHERE is_active = true;
 
 -- Full text search on job descriptions
 CREATE INDEX idx_jobs_fts ON jobs
@@ -195,6 +223,16 @@ CREATE TRIGGER update_cover_letters_updated_at
 
 CREATE TRIGGER update_emails_updated_at
     BEFORE UPDATE ON emails
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_agents_updated_at
+    BEFORE UPDATE ON agents
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_webhooks_updated_at
+    BEFORE UPDATE ON webhooks
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

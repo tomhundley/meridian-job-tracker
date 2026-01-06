@@ -4,6 +4,16 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const authToken = request.cookies.get("auth_token")?.value;
   const { pathname } = request.nextUrl;
+  const localDevBypass =
+    process.env.NODE_ENV !== "production" &&
+    process.env.LOCAL_DEV_BYPASS === "true";
+
+  if (localDevBypass) {
+    if (pathname === "/login") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return NextResponse.next();
+  }
 
   // Public paths that don't require auth
   const publicPaths = ["/login", "/api/auth/verify"];

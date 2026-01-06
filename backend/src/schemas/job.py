@@ -65,6 +65,14 @@ class JobCreate(JobBase):
     job_board_id: str | None = Field(None, max_length=255)
 
 
+class JobIngestRequest(BaseModel):
+    """Schema for ingesting a job from a URL."""
+
+    url: HttpUrl
+    source: str | None = Field(None, max_length=50)
+    notes: str | None = None
+
+
 class JobUpdate(BaseModel):
     """Schema for updating a job."""
 
@@ -87,6 +95,14 @@ class JobStatusUpdate(BaseModel):
     closed_reason: str | None = Field(None, max_length=100)
 
 
+class JobBulkStatusUpdate(BaseModel):
+    """Schema for updating status on multiple jobs."""
+
+    job_ids: list[UUID] = Field(..., min_length=1)
+    status: JobStatus
+    closed_reason: str | None = Field(None, max_length=100)
+
+
 class JobResponse(JobBase):
     """Schema for job response."""
 
@@ -102,6 +118,33 @@ class JobResponse(JobBase):
     job_board_id: str | None = None
     application_method: ApplicationMethod | None = None
     applied_at: datetime | None = None
+
+
+class JobBulkIngestRequest(BaseModel):
+    """Schema for ingesting multiple jobs from URLs."""
+
+    jobs: list[JobIngestRequest] = Field(..., min_length=1)
+
+
+class JobBulkIngestError(BaseModel):
+    """Schema for failed bulk ingest items."""
+
+    url: str
+    error: str
+
+
+class JobBulkIngestResponse(BaseModel):
+    """Schema for bulk ingest response."""
+
+    created: list[JobResponse]
+    failed: list[JobBulkIngestError]
+
+
+class JobBulkStatusResponse(BaseModel):
+    """Schema for bulk status update response."""
+
+    updated: list[JobResponse]
+    missing: list[UUID]
 
 
 class JobListResponse(BaseModel):

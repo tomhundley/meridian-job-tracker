@@ -1,9 +1,16 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8005";
+const LOCAL_DEV_BYPASS =
+  process.env.NODE_ENV !== "production" &&
+  process.env.LOCAL_DEV_BYPASS === "true";
 
 export async function GET() {
+  if (LOCAL_DEV_BYPASS) {
+    return NextResponse.json({ valid: true, bypass: true });
+  }
+
   const cookieStore = await cookies();
   const token = cookieStore.get("auth_token")?.value;
 
@@ -33,6 +40,19 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { apiKey } = await request.json();
+
+    if (LOCAL_DEV_BYPASS) {
+      const cookieStore = await cookies();
+      cookieStore.set("auth_token", apiKey || "local-dev", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      });
+
+      return NextResponse.json({ success: true, bypass: true });
+    }
 
     if (!apiKey) {
       return NextResponse.json(

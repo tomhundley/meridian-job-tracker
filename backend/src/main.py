@@ -1,11 +1,18 @@
 """FastAPI application entry point."""
 
+import time
 import uvicorn
-from fastapi import FastAPI
+import structlog
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routes import api_router
 from src.config import settings
+from src.config.logging import setup_logging
+from src.middleware import add_request_id_middleware, init_rate_limiting, register_error_handlers
+
+setup_logging()
+logger = structlog.get_logger("api")
 
 app = FastAPI(
     title="Meridian Job Tracker",
@@ -15,12 +22,16 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
 )
 
+add_request_id_middleware(app)
+register_error_handlers(app)
+init_rate_limiting(app)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "https://localhost:3000",
+        "http://localhost:3005",
+        "https://localhost:3005",
         # Add Vercel deployment URL when ready
     ],
     allow_credentials=True,
@@ -30,6 +41,23 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log request/response details."""
+    start_time = time.monotonic()
+    response = await call_next(request)
+    duration_ms = (time.monotonic() - start_time) * 1000
+    logger.info(
+        "request",
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+        duration_ms=round(duration_ms, 2),
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return response
 
 
 @app.get("/")
