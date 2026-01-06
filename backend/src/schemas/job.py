@@ -156,6 +156,7 @@ class JobResponse(JobBase):
     user_decline_reasons: list[str] | None = None
     company_decline_reasons: list[str] | None = None
     decline_notes: str | None = None
+    contact_count: int = 0  # Number of contacts associated with this job
 
 
 class JobBulkIngestRequest(BaseModel):

@@ -9,7 +9,7 @@ from sqlalchemy import func, select, case, nulls_last
 from sqlalchemy.orm import selectinload
 
 from src.api.deps import DbSession, require_permissions
-from src.models import Job, CoverLetter, JobStatus as ModelJobStatus, RoleType as ModelRoleType, WorkLocationType as ModelWorkLocationType, EmploymentType as ModelEmploymentType
+from src.models import Job, CoverLetter, JobContact, JobStatus as ModelJobStatus, RoleType as ModelRoleType, WorkLocationType as ModelWorkLocationType, EmploymentType as ModelEmploymentType
 from src.schemas import (
     JobCreate,
     JobIngestRequest,
