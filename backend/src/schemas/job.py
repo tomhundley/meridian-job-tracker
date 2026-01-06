@@ -76,6 +76,7 @@ class JobBase(BaseModel):
     salary_max: int | None = Field(None, ge=0, description="Maximum annual salary")
     salary_currency: str | None = Field("USD", max_length=3, description="ISO 4217 currency code")
     employment_type: EmploymentType | None = None
+    posted_at: datetime | None = Field(None, description="When the job was posted on the job board")
     target_role: RoleType | None = None
     priority: int = Field(50, ge=0, le=100)
     notes: str | None = None
@@ -110,6 +111,7 @@ class JobUpdate(BaseModel):
     salary_max: int | None = Field(None, ge=0)
     salary_currency: str | None = Field(None, max_length=3)
     employment_type: EmploymentType | None = None
+    posted_at: datetime | None = None
     target_role: RoleType | None = None
     priority: int | None = Field(None, ge=0, le=100)
     notes: str | None = None
@@ -153,6 +155,7 @@ class JobResponse(JobBase):
     job_board_id: str | None = None
     application_method: ApplicationMethod | None = None
     applied_at: datetime | None = None
+    posted_at: datetime | None = None
     user_decline_reasons: list[str] | None = None
     company_decline_reasons: list[str] | None = None
     decline_notes: str | None = None

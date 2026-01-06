@@ -82,6 +82,9 @@ CREATE TABLE jobs (
     notes TEXT,
     tags TEXT[],
 
+    -- Job posting date (when posted on job board)
+    posted_at TIMESTAMPTZ,
+
     -- Application details
     application_method application_method,
     applied_at TIMESTAMPTZ,

@@ -375,7 +375,7 @@ async def create_job(
 async def get_job(
     db: DbSession,
     job_id: UUID,
-) -> Job:
+) -> JobResponse:
     """Get a job by ID."""
     query = (
         select(Job)
@@ -383,6 +383,7 @@ async def get_job(
         .options(
             selectinload(Job.cover_letters),
             selectinload(Job.emails),
+            selectinload(Job.contacts),
         )
     )
     result = await db.execute(query)
@@ -394,7 +395,11 @@ async def get_job(
             detail=f"Job with id {job_id} not found",
         )
 
-    return job
+    # Build response with contacts
+    job_response = JobResponse.model_validate(job)
+    job_response.contacts = [c for c in job.contacts]
+    job_response.contact_count = len(job.contacts)
+    return job_response
 
 
 @router.patch(

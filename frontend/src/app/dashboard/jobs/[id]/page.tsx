@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail } from "lucide-react";
+import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail, X } from "lucide-react";
 import { StatusBadge } from "@/components/jobs/StatusBadge";
 import { DeclineReasonsPicker } from "@/components/jobs/DeclineReasonsPicker";
 import { toast } from "sonner";
@@ -201,6 +201,24 @@ export default function JobDetailPage() {
     setEditingNotes(false);
   };
 
+  const handleDeleteContact = async (contactId: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${id}/contacts/${contactId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        mutate(`/api/jobs/${id}/contacts`);
+        mutate("/api/jobs");
+        toast.success("Contact deleted");
+      } else {
+        toast.error("Failed to delete contact");
+      }
+    } catch (error) {
+      toast.error("Failed to delete contact");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -224,10 +242,10 @@ export default function JobDetailPage() {
               href={job.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--color-bg-secondary)] rounded-lg hover:bg-[var(--color-bg-elevated)] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0077B5] text-white rounded-lg hover:bg-[#005885] transition-colors font-medium"
             >
-              <ExternalLink size={16} />
-              View Posting
+              <Linkedin size={18} />
+              Open in LinkedIn
             </a>
           )}
           <button
@@ -499,6 +517,13 @@ export default function JobDetailPage() {
                             <Mail size={14} className="text-[var(--color-text-secondary)]" />
                           </a>
                         )}
+                        <button
+                          onClick={() => handleDeleteContact(contact.id)}
+                          className="p-1.5 hover:bg-red-500/10 rounded transition-colors"
+                          title="Delete contact"
+                        >
+                          <X size={14} className="text-[var(--color-text-tertiary)] hover:text-red-400" />
+                        </button>
                       </div>
                     </div>
                     {contact.notes && (
@@ -518,54 +543,51 @@ export default function JobDetailPage() {
 
           {/* Cover Letter Generation */}
           <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
-            <h2 className="text-lg font-semibold mb-4">Cover Letter</h2>
-
-            <div className="space-y-3">
-              <select
-                id="coverLetterRole"
-                defaultValue={job.target_role || ""}
-                className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              >
-                <option value="">Select target role...</option>
-                {roleTypes.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={() => {
-                  const select = document.getElementById("coverLetterRole") as HTMLSelectElement;
-                  if (select.value) {
-                    handleGenerateCoverLetter(select.value);
-                  } else {
-                    toast.error("Please select a target role");
-                  }
-                }}
-                disabled={isGenerating || !job.description_raw}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--color-accent)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                <FileText size={16} />
-                {isGenerating ? "Generating..." : "Generate Cover Letter"}
-              </button>
-
-              {!job.description_raw && (
-                <p className="text-xs text-[var(--color-text-tertiary)]">
-                  Add a job description to generate a cover letter.
-                </p>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <FileText size={18} />
+                Cover Letter
+              </h2>
+              {coverLetters.length > 0 && (
+                <span className="text-xs bg-[var(--color-bg-elevated)] px-2 py-0.5 rounded-full text-[var(--color-text-secondary)]">
+                  {coverLetters.length}
+                </span>
               )}
             </div>
 
+            {job.description_raw ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {roleTypes.map((r) => (
+                    <button
+                      key={r.value}
+                      onClick={() => handleGenerateCoverLetter(r.value)}
+                      disabled={isGenerating}
+                      className="px-3 py-1.5 text-xs font-medium rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGenerating ? "..." : r.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--color-text-tertiary)]">
+                  Click a role to generate a tailored cover letter
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--color-text-tertiary)]">
+                Add a job description to generate cover letters
+              </p>
+            )}
+
             {coverLetters.length > 0 && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 pt-4 border-t border-[var(--color-border-subtle)] space-y-3">
                 {coverLetters.map((letter) => (
                   <div
                     key={letter.id}
                     className="p-3 bg-[var(--color-bg-elevated)] rounded-lg"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">
+                      <span className="text-xs font-medium px-2 py-0.5 bg-[var(--color-bg-secondary)] rounded">
                         {roleTypes.find((r) => r.value === letter.target_role)?.label}
                       </span>
                       <span className="text-xs text-[var(--color-text-tertiary)]">

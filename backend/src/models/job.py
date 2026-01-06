@@ -158,6 +158,9 @@ class Job(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
 
+    # Job posting date (when posted on job board)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Application details
     application_method: Mapped[ApplicationMethod | None] = mapped_column(
         Enum(ApplicationMethod, name="application_method", create_type=False, values_callable=lambda x: [e.value for e in x]),
