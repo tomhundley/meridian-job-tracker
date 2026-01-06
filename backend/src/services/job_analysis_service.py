@@ -70,9 +70,6 @@ def analyze_job(
     # Detect AI-forward status
     is_ai_forward, ai_confidence = _detect_ai_forward(lower_text, jd_result)
 
-    # Get technologies from job
-    job_technologies = set(t.lower() for t in jd_result.requirements.technologies)
-
     # Match against resume skills
     my_skills = _get_my_skills()
     matched = [t for t in jd_result.requirements.technologies if t.lower() in my_skills]
@@ -173,7 +170,7 @@ def _suggest_role(title: str | None, jd_result: JDAnalysisResult) -> RoleType | 
     # Check for explicit role matches
     if any(kw in title_lower for kw in ["cto", "chief technology", "chief technical"]):
         return RoleType.CTO
-    if any(kw in title_lower for kw in ["vp ", "vice president", "svp ", "evp "]):
+    if any(kw in title_lower for kw in ["vp ", "vice president", "svp ", "evp ", "managing director"]):
         return RoleType.VP
     if any(kw in title_lower for kw in ["director", "head of"]):
         return RoleType.DIRECTOR

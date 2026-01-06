@@ -180,6 +180,8 @@ def _extract_employment_type(job_posting: dict[str, Any]) -> str | None:
         "parttime": "part_time",
         "contract": "contract",
         "contractor": "contract",
+        "contract_to_hire": "contract_to_hire",
+        "contracttohire": "contract_to_hire",
         "temporary": "temporary",
         "temp": "temporary",
         "intern": "internship",

@@ -70,10 +70,14 @@ TECH_PATTERNS = [
     r"\b(react|angular|vue|svelte|next\.?js|nuxt|gatsby|remix|astro|tailwind|css|sass|scss|html5?|webpack|vite)\b",
     # Backend
     r"\b(node\.?js|express|fastify|nest\.?js|django|flask|fastapi|spring|\.net|rails|laravel|asp\.net|graphql|rest|grpc)\b",
+    # Python ecosystem
+    r"\b(sqlalchemy|pydantic|celery|asyncio|pytest|uvicorn|starlette|alembic)\b",
     # Cloud/Infra
     r"\b(aws|azure|gcp|google cloud|kubernetes|k8s|docker|terraform|ansible|jenkins|ci/cd|github actions|gitlab|vercel|netlify)\b",
     # Databases
     r"\b(postgresql|postgres|mysql|mongodb|redis|elasticsearch|dynamodb|cosmos ?db|supabase|firebase|sql server|oracle|cassandra)\b",
+    # Message queues
+    r"\b(rabbitmq|kafka|sqs|sns|pubsub|redis queue|celery)\b",
     # AI/ML
     r"\b(machine learning|deep learning|nlp|computer vision|tensorflow|pytorch|scikit-learn|openai|langchain|llm|gpt|claude|anthropic|rag)\b",
     # Tools/Concepts
@@ -203,14 +207,16 @@ def extract_requirements(text: str) -> ExtractedRequirements:
 
     # Extract education requirements
     education_patterns = [
-        r"(?:bachelor'?s?|b\.?s\.?|b\.?a\.?)(?:\s+degree)?(?:\s+in\s+([^,\n]+))?",
-        r"(?:master'?s?|m\.?s\.?|m\.?a\.?|mba)(?:\s+degree)?(?:\s+in\s+([^,\n]+))?",
-        r"(?:ph\.?d\.?|doctorate)(?:\s+in\s+([^,\n]+))?",
+        (r"(?:bachelor'?s?|b\.?s\.?|b\.?a\.?)(?:\s+degree)?(?:\s+in\s+([^,\n]+))?", "Bachelor's"),
+        (r"(?:master'?s?|m\.?s\.?|m\.?a\.?|mba)(?:\s+degree)?(?:\s+in\s+([^,\n]+))?", "Master's"),
+        (r"(?:ph\.?d\.?|doctorate)(?:\s+in\s+([^,\n]+))?", "Ph.D."),
     ]
-    for pattern in education_patterns:
+    for pattern, degree_name in education_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
         if matches:
-            requirements.education.append(pattern.split("(?:")[1].split("|")[0].replace("'?s?", "'s"))
+            # Add the degree type (not the regex pattern)
+            if degree_name not in requirements.education:
+                requirements.education.append(degree_name)
 
     # Extract bullet points that look like requirements
     lines = text.split("\n")
