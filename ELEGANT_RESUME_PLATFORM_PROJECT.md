@@ -21,14 +21,16 @@ The system comprises two primary components: **Sparkles AI Agent** for intellige
 1. [Project Overview](#project-overview)
 2. [Sparkles AI Agent](#sparkles-ai-agent)
 3. [Personal Brand Website](#personal-brand-website)
-4. [Complete Technology Stack](#complete-technology-stack)
-5. [Architecture & System Design](#architecture--system-design)
-6. [Database Design & Data Modeling](#database-design--data-modeling)
-7. [Multi-Role Resume System](#multi-role-resume-system)
-8. [Security Architecture](#security-architecture)
-9. [AI/ML Integration](#aiml-integration)
-10. [Role-Based Contribution Analysis](#role-based-contribution-analysis)
-11. [Key Achievements & Metrics](#key-achievements--metrics)
+4. [Blog System & Semantic Search](#blog-system--semantic-search) ⭐ *Flagship Feature*
+5. [AI-Powered Content Creation](#ai-powered-content-creation) ⭐ *Flagship Feature*
+6. [Complete Technology Stack](#complete-technology-stack)
+7. [Architecture & System Design](#architecture--system-design)
+8. [Database Design & Data Modeling](#database-design--data-modeling)
+9. [Multi-Role Resume System](#multi-role-resume-system)
+10. [Security Architecture](#security-architecture)
+11. [AI/ML Integration](#aiml-integration)
+12. [Role-Based Contribution Analysis](#role-based-contribution-analysis)
+13. [Key Achievements & Metrics](#key-achievements--metrics)
 
 ---
 
@@ -709,6 +711,251 @@ Form Submission
       │
       └──► Email: Admin notification
 ```
+
+---
+
+## Blog System & Semantic Search
+
+### Overview
+
+The **Blog System** on thomashundley.com is a comprehensive content platform that combines traditional publishing capabilities with cutting-edge AI-powered semantic search. This isn't just a blog—it's an intelligent content discovery system that helps visitors find exactly what they're looking for through natural language queries.
+
+### Blog Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      BLOG SYSTEM ARCHITECTURE                               │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   CONTENT STORAGE                                                          │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │  Markdown + MDX Content                                             │ │
+│   │  • YAML frontmatter (title, date, author, tags, topics)            │ │
+│   │  • GitHub Flavored Markdown (GFM) support                          │ │
+│   │  • Syntax-highlighted code blocks (Shiki)                          │ │
+│   │  • Embedded images and media                                       │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│   SEMANTIC SEARCH PIPELINE                                                 │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  User Query: "What AI tools help with resume writing?"              │ │
+│   │       │                                                             │ │
+│   │       ▼                                                             │ │
+│   │  ┌─────────────────┐                                               │ │
+│   │  │ OpenAI API      │  Generate 1536-dimensional embedding          │ │
+│   │  │ text-embedding- │                                               │ │
+│   │  │ 3-small         │                                               │ │
+│   │  └────────┬────────┘                                               │ │
+│   │           │                                                         │ │
+│   │           ▼                                                         │ │
+│   │  ┌─────────────────┐                                               │ │
+│   │  │ pgVector        │  Cosine similarity search against             │ │
+│   │  │ PostgreSQL      │  pre-computed article embeddings              │ │
+│   │  └────────┬────────┘                                               │ │
+│   │           │                                                         │ │
+│   │           ▼                                                         │ │
+│   │  Ranked Results by Semantic Relevance                              │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│   CONTENT FEATURES                                                         │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                                                                     │ │
+│   │  • Topic Hierarchy (parent/child categorization)                   │ │
+│   │  • Tag-based Filtering                                             │ │
+│   │  • Reading Time Calculation                                        │ │
+│   │  • Social Sharing Integration                                      │ │
+│   │  • RSS Feed Generation                                             │ │
+│   │  • Related Posts (vector similarity)                               │ │
+│   │  • Admin Dashboard for Publishing                                  │ │
+│   │                                                                     │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Semantic Search Technical Implementation
+
+**Embedding Model:** OpenAI `text-embedding-3-small`
+**Vector Dimensions:** 1536
+**Database:** Supabase PostgreSQL with pgVector extension
+**Similarity Metric:** Cosine similarity
+**Response Time:** Sub-100ms queries
+
+```typescript
+// Semantic search implementation
+async function searchBlogPosts(query: string): Promise<SearchResult[]> {
+  // 1. Generate query embedding
+  const queryEmbedding = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: query,
+  });
+
+  // 2. Execute pgVector cosine similarity search
+  const { data } = await supabase.rpc('match_blog_posts', {
+    query_embedding: queryEmbedding.data[0].embedding,
+    match_threshold: 0.7,
+    match_count: 10,
+  });
+
+  return data;
+}
+```
+
+### Key Capabilities
+
+| Feature | Implementation | Benefit |
+|---------|----------------|---------|
+| **Natural Language Search** | OpenAI embeddings | Users search conversationally |
+| **Semantic Understanding** | Vector similarity | Finds conceptually related content |
+| **Real-time Results** | pgVector HNSW index | Sub-100ms response times |
+| **Related Posts** | Vector proximity | Automatic content recommendations |
+| **Topic Navigation** | Hierarchical taxonomy | Organized content discovery |
+
+---
+
+## AI-Powered Content Creation
+
+### The Content Factory
+
+The blog content on thomashundley.com is produced through a sophisticated **AI-powered content creation pipeline**. This system combines the strengths of multiple AI models with human editorial oversight to produce high-quality, accurate, and engaging technical content.
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│               AI-POWERED CONTENT CREATION SYSTEM                           │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                      CONTENT PIPELINE                               │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│        ┌──────────────┐                                                   │
+│        │ TOM HUNDLEY  │  Strategic Direction & Editorial Calendar         │
+│        │  (Curator)   │  Topic Selection & Brand Voice                    │
+│        └──────┬───────┘                                                   │
+│               │                                                            │
+│               ▼                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                    AI CONTENT AGENTS                                │ │
+│   │                                                                     │ │
+│   │   ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐   │ │
+│   │   │  CLAUDE 4.5      │  │  GEMINI 3.0      │  │  CHATGPT       │   │ │
+│   │   │  OPUS            │  │  PRO             │  │  CODEX 5.2     │   │ │
+│   │   │                  │  │                  │  │                │   │ │
+│   │   │  • Long-form     │  │  • Research &    │  │  • Technical   │   │ │
+│   │   │    articles      │  │    analysis      │  │    tutorials   │   │ │
+│   │   │  • Technical     │  │  • Data          │  │  • Code        │   │ │
+│   │   │    depth         │  │    synthesis     │  │    examples    │   │ │
+│   │   │  • Nuanced       │  │  • Fact          │  │  • Step-by-    │   │ │
+│   │   │    writing       │  │    verification  │  │    step guides │   │ │
+│   │   └──────────────────┘  └──────────────────┘  └────────────────┘   │ │
+│   │                              │                                      │ │
+│   │                              ▼                                      │ │
+│   │                    ┌────────────────────┐                          │ │
+│   │                    │  FACT-CHECKING     │                          │ │
+│   │                    │  AI AGENTS         │                          │ │
+│   │                    │                    │                          │ │
+│   │                    │  • Cross-reference │                          │ │
+│   │                    │    sources         │                          │ │
+│   │                    │  • Verify claims   │                          │ │
+│   │                    │  • Check accuracy  │                          │ │
+│   │                    │  • Flag issues     │                          │ │
+│   │                    └──────────┬─────────┘                          │ │
+│   │                               │                                     │ │
+│   └───────────────────────────────┼─────────────────────────────────────┘ │
+│                                   │                                       │
+│                                   ▼                                       │
+│        ┌──────────────────────────────────────────────────────────────┐  │
+│        │                  HUMAN CURATION                              │  │
+│        │                                                              │  │
+│        │   Tom Hundley reviews:                                       │  │
+│        │   • Accuracy & technical correctness                         │  │
+│        │   • Brand voice & messaging alignment                        │  │
+│        │   • Strategic value & relevance                              │  │
+│        │   • Final approval for publication                           │  │
+│        │                                                              │  │
+│        └──────────────────────────────────────────────────────────────┘  │
+│                                   │                                       │
+│                                   ▼                                       │
+│                        ┌────────────────────┐                            │
+│                        │   PUBLISHED        │                            │
+│                        │   CONTENT          │                            │
+│                        │                    │                            │
+│                        │   thomashundley.com│                            │
+│                        │   Blog Platform    │                            │
+│                        └────────────────────┘                            │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Content Creation Workflow
+
+| Stage | Actor | Responsibility |
+|-------|-------|----------------|
+| **1. Planning** | Tom Hundley (Human) | Topic selection, editorial calendar, strategic direction |
+| **2. Research** | AI Agents | Gather information, analyze sources, compile data |
+| **3. Drafting** | AI Agents | Write initial content drafts with technical depth |
+| **4. Fact-Checking** | AI Agents | Cross-reference claims, verify accuracy, flag issues |
+| **5. Review** | Tom Hundley (Human) | Editorial review, brand alignment, accuracy verification |
+| **6. Publication** | Automated | Deploy to blog, generate embeddings, update search index |
+
+### AI Agent Specializations
+
+**Claude 4.5 Opus (Anthropic)**
+- Long-form technical articles requiring nuanced analysis
+- Complex topics needing careful explanation
+- Content requiring strong reasoning and coherence
+
+**Gemini 3.0 Pro (Google)**
+- Research synthesis and data analysis
+- Fact verification and source checking
+- Multi-source information compilation
+
+**ChatGPT Codex 5.2 (OpenAI)**
+- Technical tutorials with code examples
+- Step-by-step implementation guides
+- Developer-focused content
+
+### Quality Assurance
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    CONTENT QUALITY GATES                                   │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   GATE 1: AI FACT-CHECK                                                   │
+│   ├── Cross-reference with authoritative sources                          │
+│   ├── Verify technical claims and code examples                           │
+│   ├── Check for outdated information                                      │
+│   └── Flag uncertain or unverifiable claims                               │
+│                                                                            │
+│   GATE 2: HUMAN REVIEW                                                    │
+│   ├── Accuracy verification by subject matter expert                      │
+│   ├── Brand voice and messaging consistency                               │
+│   ├── Strategic alignment with content goals                              │
+│   └── Final approval for publication                                      │
+│                                                                            │
+│   GATE 3: AUTOMATED CHECKS                                                │
+│   ├── Spelling and grammar validation                                     │
+│   ├── Link verification                                                   │
+│   ├── SEO optimization scoring                                            │
+│   └── Accessibility compliance                                            │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### The Human-AI Partnership
+
+This content creation system exemplifies **Tom Hundley's role as AI Orchestrator**:
+
+- **Human Direction**: Tom provides strategic guidance, selects topics, and ensures content aligns with business objectives
+- **AI Execution**: Multiple AI agents handle research, writing, and initial fact-checking at scale
+- **AI Quality Control**: Dedicated fact-checking agents verify accuracy before human review
+- **Human Curation**: Final editorial control ensures quality, accuracy, and brand consistency
+- **Continuous Improvement**: Feedback loops improve AI performance over time
+
+The result is a content engine that produces high-quality, technically accurate articles at a pace impossible for traditional content teams, while maintaining the editorial oversight necessary for professional publishing.
 
 ---
 
