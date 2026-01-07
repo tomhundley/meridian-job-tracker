@@ -28,7 +28,8 @@ from src.schemas import (
     CoverLetterCreate,
     CoverLetterResponse,
 )
-from src.services import job_scraper, JobScrapeError, analyze_job
+from src.schemas.job_note import JobNoteCreate, JobNoteEntry, NoteSource
+from src.services import job_scraper, JobScrapeError, analyze_job, analyze_job_with_ai
 
 router = APIRouter()
 
@@ -63,6 +64,7 @@ def build_job_response(job: Job, contacts: list | None = None) -> JobResponse:
         is_favorite=job.is_favorite,
         is_perfect_fit=job.is_perfect_fit,
         is_ai_forward=job.is_ai_forward,
+        is_location_compatible=job.is_location_compatible,
         status=job.status,
         status_changed_at=job.status_changed_at,
         closed_reason=job.closed_reason,
@@ -89,7 +91,7 @@ async def list_jobs(
     db: DbSession,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
-    status: JobStatus | None = None,
+    status: Annotated[str | None, Query(description="Comma-separated list of statuses to filter by")] = None,
     company: str | None = None,
     target_role: RoleType | None = None,
     work_location_type: WorkLocationType | None = None,
@@ -97,6 +99,7 @@ async def list_jobs(
     is_favorite: Annotated[bool | None, Query(description="Filter by favorite status")] = None,
     is_perfect_fit: Annotated[bool | None, Query(description="Filter by perfect fit status")] = None,
     is_ai_forward: Annotated[bool | None, Query(description="Filter by AI-forward status")] = None,
+    is_location_compatible: Annotated[bool | None, Query(description="Filter by location compatibility")] = None,
     min_priority: Annotated[int | None, Query(ge=0, le=100)] = None,
     min_salary: Annotated[int | None, Query(ge=0, description="Minimum salary filter")] = None,
     max_salary: Annotated[int | None, Query(ge=0, description="Maximum salary filter")] = None,
@@ -111,7 +114,12 @@ async def list_jobs(
 
     # Apply filters
     if status:
-        query = query.where(Job.status == ModelJobStatus(status.value))
+        # Support comma-separated list of statuses
+        status_list = [s.strip() for s in status.split(",") if s.strip()]
+        if status_list:
+            status_enums = [ModelJobStatus(s) for s in status_list if s in [e.value for e in ModelJobStatus]]
+            if status_enums:
+                query = query.where(Job.status.in_(status_enums))
     if company:
         query = query.where(Job.company.ilike(f"%{company}%"))
     if target_role:
@@ -126,6 +134,8 @@ async def list_jobs(
         query = query.where(Job.is_perfect_fit == is_perfect_fit)
     if is_ai_forward is not None:
         query = query.where(Job.is_ai_forward == is_ai_forward)
+    if is_location_compatible is not None:
+        query = query.where(Job.is_location_compatible == is_location_compatible)
     if min_priority is not None:
         query = query.where(Job.priority >= min_priority)
     if min_salary is not None:
@@ -312,7 +322,7 @@ async def ingest_job(
         employment_type=employment_type,
         work_location_type=work_location_type,
         posted_at=posted_at,
-        notes=request.notes,
+        notes=[{"text": request.notes, "timestamp": datetime.utcnow().isoformat() + "Z", "source": "user"}] if request.notes else None,
     )
 
     # Run job analysis to set priority, is_ai_forward, and target_role
@@ -418,7 +428,7 @@ async def bulk_ingest_jobs(
             employment_type=employment_type,
             work_location_type=work_location_type,
             posted_at=posted_at,
-            notes=job_request.notes,
+            notes=[{"text": job_request.notes, "timestamp": datetime.utcnow().isoformat() + "Z", "source": "user"}] if job_request.notes else None,
         )
 
         # Run job analysis to set priority, is_ai_forward, and target_role
@@ -698,6 +708,8 @@ async def update_job_status(
     summary="Analyze job fit",
     description=(
         "Analyze a job to determine AI-forward status, fit score, and role suggestions.\n\n"
+        "**AI Analysis:** When `use_ai=true` (default), uses Claude for semantic analysis.\n"
+        "Falls back to rule-based analysis if AI unavailable.\n\n"
         "Returns:\n"
         "- **is_ai_forward**: Whether this is an AI-forward company/role\n"
         "- **ai_confidence**: Confidence score (0-1) for AI-forward detection\n"
@@ -711,6 +723,7 @@ async def analyze_job_fit(
     db: DbSession,
     job_id: UUID,
     apply_suggestions: Annotated[bool, Query(description="Apply suggested priority and is_ai_forward to job")] = False,
+    use_ai: Annotated[bool, Query(description="Use AI (Claude) for semantic analysis")] = True,
 ) -> JobAnalysisResponse:
     """Analyze a job for fit and AI-forward status."""
     query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
@@ -729,19 +742,32 @@ async def analyze_job_fit(
             detail="Job has no description to analyze",
         )
 
-    # Run analysis
-    analysis = analyze_job(
-        description=job.description_raw,
-        title=job.title,
-        company=job.company,
-    )
+    # Run analysis - use AI by default
+    analysis, ai_result = analyze_job_with_ai(job, use_ai=use_ai)
 
     # Optionally apply suggestions to the job
     if apply_suggestions:
         job.priority = analysis.suggested_priority
         job.is_ai_forward = analysis.is_ai_forward
+        job.is_location_compatible = analysis.is_location_compatible
         if analysis.suggested_role:
             job.target_role = ModelRoleType(analysis.suggested_role.value)
+
+        # Auto-reject if location is incompatible
+        if not analysis.is_location_compatible:
+            job.status = ModelJobStatus.ARCHIVED
+            # Add 'location' to user_decline_reasons
+            existing_reasons = job.user_decline_reasons or []
+            if "location" not in existing_reasons:
+                job.user_decline_reasons = existing_reasons + ["location"]
+            # Add location note to decline_notes
+            if analysis.location_notes:
+                existing_notes = job.decline_notes or ""
+                if existing_notes:
+                    job.decline_notes = f"{existing_notes}\n{analysis.location_notes}"
+                else:
+                    job.decline_notes = analysis.location_notes
+
         await db.flush()
 
     # Convert role_scores to response format
@@ -768,6 +794,8 @@ async def analyze_job_fit(
         seniority_level=analysis.seniority_level,
         analysis_notes=analysis.analysis_notes,
         role_scores=role_scores_response,
+        is_location_compatible=analysis.is_location_compatible,
+        location_notes=analysis.location_notes,
     )
 
 
@@ -795,6 +823,75 @@ async def delete_job(
 
     job.deleted_at = datetime.utcnow()
     await db.flush()
+
+
+# Notes endpoints
+@router.post(
+    "/{job_id}/notes",
+    response_model=JobNoteEntry,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add note to job",
+    description="Add a new note to a job.",
+    dependencies=[Depends(require_permissions(["jobs:write"]))],
+)
+async def add_job_note(
+    db: DbSession,
+    job_id: UUID,
+    note_in: JobNoteCreate,
+) -> JobNoteEntry:
+    """Add a note to a job."""
+    query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
+    result = await db.execute(query)
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job with id {job_id} not found",
+        )
+
+    # Create new note entry
+    new_note = JobNoteEntry(
+        text=note_in.text,
+        timestamp=datetime.utcnow(),
+        source=note_in.source,
+    )
+
+    # Append to existing notes array (or create new array)
+    existing_notes = job.notes or []
+    job.notes = existing_notes + [new_note.model_dump(mode="json")]
+
+    await db.flush()
+
+    return new_note
+
+
+@router.get(
+    "/{job_id}/notes",
+    response_model=list[JobNoteEntry],
+    summary="List notes for job",
+    description="List all notes for a job.",
+    dependencies=[Depends(require_permissions(["jobs:read"]))],
+)
+async def list_job_notes(
+    db: DbSession,
+    job_id: UUID,
+) -> list[JobNoteEntry]:
+    """List all notes for a job."""
+    query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
+    result = await db.execute(query)
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job with id {job_id} not found",
+        )
+
+    if not job.notes:
+        return []
+
+    return [JobNoteEntry(**note) for note in job.notes]
 
 
 # Cover letter generation endpoint
