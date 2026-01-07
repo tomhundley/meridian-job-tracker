@@ -121,7 +121,7 @@ Frontend `.env.local`:
 - `BACKEND_URL`
 
 ## Tests
-- Backend tests skip unless `TEST_DATABASE_URL` is set.
+- Backend tests use the main database with transaction rollback for isolation.
 - Frontend uses Vitest (`frontend/vitest.config.ts`).
 
 ## Important Files

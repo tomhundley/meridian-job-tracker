@@ -5,7 +5,6 @@ rolled back at the end, so no test data persists to the database.
 """
 
 import asyncio
-import os
 
 import pytest
 import httpx
@@ -18,11 +17,8 @@ from src.config.database import Base, get_db
 from src.main import app
 
 
-# Use production database URL - tests run in transactions that rollback
-TEST_DB_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://meridian:meridian@localhost:5434/meridian_jobs"
-)
+# Use main database - tests run in transactions that rollback
+TEST_DB_URL = "postgresql+asyncpg://meridian:meridian@localhost:5434/meridian_jobs"
 
 
 @pytest.fixture(scope="session")

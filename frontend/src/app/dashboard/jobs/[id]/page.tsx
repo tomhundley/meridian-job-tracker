@@ -8,6 +8,9 @@ import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail,
 import { StatusBadge } from "@/components/jobs/StatusBadge";
 import { DeclineReasonsPicker } from "@/components/jobs/DeclineReasonsPicker";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { StatusPipeline } from "@/components/jobs/StatusPipeline";
+import { JobFlagsToggle } from "@/components/jobs/JobFlagsToggle";
+import { RolePriorityScores } from "@/components/jobs/RolePriorityScores";
 import { toast } from "sonner";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -287,6 +290,9 @@ export default function JobDetailPage() {
               )}
             </div>
             <p className="text-[var(--color-text-secondary)]">{job.company}</p>
+            <p className="text-xs text-[var(--color-text-tertiary)] font-mono mt-1">
+              Job ID: {job.id}
+            </p>
           </div>
         </div>
 
@@ -315,123 +321,54 @@ export default function JobDetailPage() {
       <div className="grid grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="col-span-2 space-y-6">
-          {/* Status & Details Card */}
+          {/* Role Fit Scores */}
+          <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
+            <h3 className="text-[10px] uppercase tracking-[0.15em] text-[var(--color-text-tertiary)] mb-4 font-semibold text-center">
+              Role Fit Scores
+            </h3>
+            <RolePriorityScores
+              jobId={id}
+              hasDescription={!!job.description_raw}
+              fallbackPriority={job.priority}
+            />
+          </div>
+
+          {/* Application Status */}
+          <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
+            <h3 className="text-[10px] uppercase tracking-[0.15em] text-[var(--color-text-tertiary)] mb-4 font-semibold">
+              Application Status
+            </h3>
+            <StatusPipeline
+              currentStatus={job.status}
+              onStatusChange={handleStatusChange}
+              disabled={isUpdating}
+            />
+          </div>
+
+          {/* Job Flags */}
+          <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
+            <h3 className="text-[10px] uppercase tracking-[0.15em] text-[var(--color-text-tertiary)] mb-4 font-semibold">
+              Job Flags
+            </h3>
+            <JobFlagsToggle
+              isFavorite={job.is_favorite}
+              isPerfectFit={job.is_perfect_fit}
+              isAiForward={job.is_ai_forward}
+              isEasyApply={job.is_easy_apply}
+              onToggle={(flag, value) => handleUpdateJob({ [flag]: value })}
+              disabled={isUpdating}
+            />
+          </div>
+
+          {/* Details Card */}
           <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
             <h2 className="text-lg font-semibold mb-4">Details</h2>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
-                  Status
-                </label>
-                <select
-                  value={job.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  disabled={isUpdating}
-                  className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                >
-                  {statuses.map((s) => (
-                    <option key={s} value={s}>
-                      {s.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
-                  Target Role
-                </label>
-                <select
-                  value={job.target_role || ""}
-                  onChange={(e) => handleUpdateJob({ target_role: e.target.value || null })}
-                  disabled={isUpdating}
-                  className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                >
-                  <option value="">Select role...</option>
-                  {roleTypes.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
-                  Location
-                </label>
-                <p className="px-3 py-2">{job.location || "-"}</p>
-              </div>
-
-              <div>
-                <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
-                  Priority
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={job.priority}
-                  onChange={(e) => handleUpdateJob({ priority: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-[var(--color-text-tertiary)]">
-                  <span>Low</span>
-                  <span>{job.priority}</span>
-                  <span>High</span>
-                </div>
-              </div>
-            </div>
-
-            {/* User Preference Flags */}
-            <div className="mt-6 pt-6 border-t border-[var(--color-border-subtle)]">
-              <h3 className="text-base font-semibold mb-4">Job Flags</h3>
-              <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={job.is_favorite}
-                    onChange={(e) => handleUpdateJob({ is_favorite: e.target.checked })}
-                    disabled={isUpdating}
-                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-red-500 focus:ring-red-500"
-                  />
-                  <span className="text-sm flex items-center gap-1">
-                    <Heart size={14} className={job.is_favorite ? "text-red-400 fill-red-400" : "text-[var(--color-text-tertiary)]"} />
-                    Favorite
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={job.is_perfect_fit}
-                    onChange={(e) => handleUpdateJob({ is_perfect_fit: e.target.checked })}
-                    disabled={isUpdating}
-                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-purple-500 focus:ring-purple-500"
-                  />
-                  <span className="text-sm">Perfect Fit</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={job.is_ai_forward}
-                    onChange={(e) => handleUpdateJob({ is_ai_forward: e.target.checked })}
-                    disabled={isUpdating}
-                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-blue-500 focus:ring-blue-500"
-                  />
-                  <span className="text-sm">AI Forward</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={job.is_easy_apply}
-                    onChange={(e) => handleUpdateJob({ is_easy_apply: e.target.checked })}
-                    disabled={isUpdating}
-                    className="w-4 h-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] text-green-500 focus:ring-green-500"
-                  />
-                  <span className="text-sm">Easy Apply</span>
-                </label>
-              </div>
+            <div>
+              <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
+                Location
+              </label>
+              <p className="px-3 py-2">{job.location || "-"}</p>
             </div>
 
             {/* Decline Reasons Section - shown when rejected or withdrawn */}

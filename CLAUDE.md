@@ -158,9 +158,10 @@ All skills are in `.claude/commands/`. Key skills:
 ## Testing
 
 ```bash
-# Backend tests
+# Backend tests (uses main database with transaction rollback)
 cd backend
-TEST_DATABASE_URL="postgresql+asyncpg://meridian:meridian@localhost:5433/meridian_test" pytest
+source .venv/bin/activate
+pytest
 
 # Frontend tests
 cd frontend

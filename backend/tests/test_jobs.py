@@ -374,3 +374,27 @@ async def test_list_jobs_sort_by_salary(client, api_key_header, test_job_payload
     titles = [job["title"] for job in data["items"]]
     # High Pay should be in results
     assert "High Pay" in titles
+
+
+@pytest.mark.asyncio
+async def test_search_jobs_by_id(client, api_key_header, test_job_payload):
+    """Test searching jobs by job ID (UUID)."""
+    # Create a job
+    payload = test_job_payload(title="Unique Job", company="SearchCo")
+    response = await client.post("/api/v1/jobs", json=payload, headers=api_key_header)
+    assert response.status_code == 201
+    job_id = response.json()["id"]
+
+    # Search by full UUID
+    response = await client.get(f"/api/v1/jobs?search={job_id}", headers=api_key_header)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) >= 1
+    assert any(job["id"] == job_id for job in data["items"])
+
+    # Search by partial UUID (first 8 characters)
+    partial_id = job_id[:8]
+    response = await client.get(f"/api/v1/jobs?search={partial_id}", headers=api_key_header)
+    assert response.status_code == 200
+    data = response.json()
+    assert any(job["id"] == job_id for job in data["items"])

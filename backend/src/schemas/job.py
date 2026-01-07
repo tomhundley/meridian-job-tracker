@@ -210,6 +210,14 @@ class JobListResponse(BaseModel):
     total_pages: int
 
 
+class RoleScoreResponse(BaseModel):
+    """Schema for a role-specific score."""
+
+    role: RoleType = Field(..., description="The role type")
+    score: int = Field(..., ge=0, le=100, description="Fit score for this role")
+    label: str = Field(..., description="Human readable role label")
+
+
 class JobAnalysisResponse(BaseModel):
     """Schema for job analysis result."""
 
@@ -222,3 +230,4 @@ class JobAnalysisResponse(BaseModel):
     years_experience_required: int | None = Field(None, description="Years of experience required")
     seniority_level: str | None = Field(None, description="Detected seniority level")
     analysis_notes: list[str] = Field(default_factory=list, description="Analysis notes and observations")
+    role_scores: list[RoleScoreResponse] | None = Field(None, description="Fit scores for each target role")

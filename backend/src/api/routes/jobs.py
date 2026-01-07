@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select, case, nulls_last
+from sqlalchemy import cast, func, select, case, nulls_last, String
 from sqlalchemy.orm import selectinload
 
 from src.api.deps import DbSession, require_permissions
@@ -139,11 +139,12 @@ async def list_jobs(
             (Job.salary_min <= max_salary) | ((Job.salary_min.is_(None)) & (Job.salary_max <= max_salary))
         )
     if search:
-        # Simple search on title, company, description
+        # Search on title, company, description, and job ID
         search_filter = (
             Job.title.ilike(f"%{search}%")
             | Job.company.ilike(f"%{search}%")
             | Job.description_raw.ilike(f"%{search}%")
+            | cast(Job.id, String).ilike(f"%{search}%")
         )
         query = query.where(search_filter)
     if max_age_days is not None:
@@ -743,6 +744,19 @@ async def analyze_job_fit(
             job.target_role = ModelRoleType(analysis.suggested_role.value)
         await db.flush()
 
+    # Convert role_scores to response format
+    role_scores_response = None
+    if analysis.role_scores:
+        from src.schemas.job import RoleScoreResponse
+        role_scores_response = [
+            RoleScoreResponse(
+                role=RoleType(rs.role.value),
+                score=rs.score,
+                label=rs.label,
+            )
+            for rs in analysis.role_scores
+        ]
+
     return JobAnalysisResponse(
         is_ai_forward=analysis.is_ai_forward,
         ai_confidence=analysis.ai_confidence,
@@ -753,6 +767,7 @@ async def analyze_job_fit(
         years_experience_required=analysis.years_experience_required,
         seniority_level=analysis.seniority_level,
         analysis_notes=analysis.analysis_notes,
+        role_scores=role_scores_response,
     )
 
 

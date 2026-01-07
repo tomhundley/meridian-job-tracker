@@ -30,6 +30,15 @@ AI_CULTURE_INDICATORS = {
 
 
 @dataclass
+class RoleScore:
+    """Score for a specific role."""
+
+    role: RoleType
+    score: int  # 0-100
+    label: str  # Human readable label
+
+
+@dataclass
 class JobAnalysisResult:
     """Result of analyzing a job posting."""
 
@@ -42,6 +51,7 @@ class JobAnalysisResult:
     years_experience_required: int | None
     seniority_level: str | None
     analysis_notes: list[str]
+    role_scores: list[RoleScore] | None = None  # Scores for each role
 
 
 def analyze_job(
@@ -88,6 +98,15 @@ def analyze_job(
         suggested_role,
     )
 
+    # Calculate scores for all roles
+    role_scores = _calculate_role_scores(
+        jd_result,
+        title,
+        matched,
+        missing,
+        is_ai_forward,
+    )
+
     return JobAnalysisResult(
         is_ai_forward=is_ai_forward,
         ai_confidence=ai_confidence,
@@ -98,6 +117,7 @@ def analyze_job(
         years_experience_required=jd_result.requirements.years_experience,
         seniority_level=jd_result.requirements.seniority_level,
         analysis_notes=notes,
+        role_scores=role_scores,
     )
 
 
@@ -253,6 +273,90 @@ def _calculate_fit_score(
     score = max(0, min(100, score))
 
     return score, notes
+
+
+# Role labels for display
+ROLE_LABELS = {
+    RoleType.CTO: "CTO",
+    RoleType.VP: "VP Eng",
+    RoleType.DIRECTOR: "Director",
+    RoleType.ARCHITECT: "Architect",
+    RoleType.DEVELOPER: "Developer",
+}
+
+# Role alignment bonuses - how well each role type aligns with different job requirements
+ROLE_ALIGNMENT_MATRIX = {
+    # When the job suggests CTO role, bonuses for each role type
+    RoleType.CTO: {RoleType.CTO: 25, RoleType.VP: 20, RoleType.DIRECTOR: 10, RoleType.ARCHITECT: 5, RoleType.DEVELOPER: 0},
+    # When the job suggests VP role
+    RoleType.VP: {RoleType.CTO: 20, RoleType.VP: 25, RoleType.DIRECTOR: 15, RoleType.ARCHITECT: 5, RoleType.DEVELOPER: 0},
+    # When the job suggests Director role
+    RoleType.DIRECTOR: {RoleType.CTO: 10, RoleType.VP: 15, RoleType.DIRECTOR: 25, RoleType.ARCHITECT: 10, RoleType.DEVELOPER: 5},
+    # When the job suggests Architect role
+    RoleType.ARCHITECT: {RoleType.CTO: 5, RoleType.VP: 5, RoleType.DIRECTOR: 10, RoleType.ARCHITECT: 25, RoleType.DEVELOPER: 15},
+    # Default/No suggestion - favor leadership roles
+    None: {RoleType.CTO: 10, RoleType.VP: 10, RoleType.DIRECTOR: 10, RoleType.ARCHITECT: 10, RoleType.DEVELOPER: 5},
+}
+
+
+def _calculate_role_scores(
+    jd_result: JDAnalysisResult,
+    title: str | None,
+    matched_tech: list[str],
+    missing_tech: list[str],
+    is_ai_forward: bool,
+) -> list[RoleScore]:
+    """Calculate fit scores for all roles."""
+    # Get the suggested role for this job
+    suggested_role = _suggest_role(title, jd_result)
+
+    # Get alignment bonuses based on suggested role
+    alignment_bonuses = ROLE_ALIGNMENT_MATRIX.get(suggested_role, ROLE_ALIGNMENT_MATRIX[None])
+
+    role_scores = []
+
+    for role in [RoleType.CTO, RoleType.VP, RoleType.DIRECTOR, RoleType.ARCHITECT, RoleType.DEVELOPER]:
+        score = 40  # Base score
+
+        # Role alignment bonus
+        score += alignment_bonuses.get(role, 0)
+
+        # Technology match (same for all roles)
+        total_tech = len(matched_tech) + len(missing_tech)
+        if total_tech > 0:
+            match_ratio = len(matched_tech) / total_tech
+            tech_score = int(match_ratio * 20)
+            score += tech_score
+            if match_ratio < 0.3 and total_tech > 3:
+                score -= 10
+
+        # AI-forward bonus (same for all roles)
+        if is_ai_forward:
+            score += 10
+
+        # Experience level check (same for all roles)
+        years_req = jd_result.requirements.years_experience
+        if years_req and years_req <= 15:
+            score += 5
+
+        # Title relevance (same for all roles)
+        if title:
+            title_lower = title.lower()
+            if any(kw in title_lower for kw in ["software", "engineering", "technology", "technical"]):
+                score += 5
+            if any(kw in title_lower for kw in ["remote", "distributed"]):
+                score += 3
+
+        # Clamp score to 0-100
+        score = max(0, min(100, score))
+
+        role_scores.append(RoleScore(
+            role=role,
+            score=score,
+            label=ROLE_LABELS[role],
+        ))
+
+    return role_scores
 
 
 # Singleton instance
