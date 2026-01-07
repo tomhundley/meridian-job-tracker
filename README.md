@@ -6,19 +6,22 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A human-in-the-loop job application tracking system with LinkedIn browser automation, AI-powered cover letter generation, and a modern web dashboard.
+A human-in-the-loop job application tracking system with AI-powered analysis, RAG-enhanced coaching, LinkedIn browser automation, and a modern web dashboard.
 
 > **Part of the Meridian Suite**
-> - [trh-meridian](https://github.com/ElegantSoftwareSolutions/trh-meridian) - Resume & Portfolio Site
+> - [trh-meridian](https://github.com/ElegantSoftwareSolutions/trh-meridian) - Resume & Portfolio Site (includes Sparkles RAG)
 > - [meridian-linkedIn](https://github.com/tomhundley/meridian-linkedIn) - LinkedIn MCP Server
 > - **meridian-job-tracker** - Job Application Tracker (this repo)
 
 ## Features
 
+- **AI Job Analysis** - Claude-powered semantic analysis with fit scoring (0-100)
+- **RAG-Enhanced Coaching** - Match job requirements against 260+ career documents via Sparkles
+- **Typed Notes System** - Automated coaching notes, talking points, study recommendations
 - **Job Pipeline Tracking** - Track opportunities from discovery to offer
 - **AI Cover Letters** - Generate role-specific cover letters with Claude
-- **LinkedIn Automation** - Streamline Easy Apply with human-in-the-loop confirmation
-- **Email Integration** - Link correspondence to job applications
+- **LinkedIn Automation** - Browser automation for job extraction with human-in-the-loop confirmation
+- **Location Validation** - Auto-detect and flag location-incompatible remote jobs
 - **Agent APIs & Webhooks** - Scoped API keys, bulk ingestion, and notifications
 - **Modern Dashboard** - Next.js 15 with real-time updates
 
@@ -36,14 +39,18 @@ A human-in-the-loop job application tracking system with LinkedIn browser automa
                     ┌────────────────────────┐
                     │    FastAPI Backend     │
                     │  • Jobs API            │
+                    │  • AI Analysis (Claude)│
+                    │  • RAG (Sparkles)      │
                     │  • Cover Letter Gen    │
-                    │  • LinkedIn Automation │
                     └────────────┬───────────┘
                                  │
-                                 ▼
-                    ┌────────────────────────┐
-                    │  PostgreSQL Database   │
-                    └────────────────────────┘
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+              ▼                  ▼                  ▼
+┌─────────────────────┐  ┌──────────────┐  ┌─────────────────┐
+│ PostgreSQL Database │  │ Sparkles RAG │  │ OpenAI API      │
+│ (Jobs, Notes)       │  │ (Supabase)   │  │ (Embeddings)    │
+└─────────────────────┘  └──────────────┘  └─────────────────┘
 ```
 
 ## Quick Start
@@ -142,12 +149,42 @@ meridian-job-tracker/
 | POST | `/api/v1/jobs/ingest` | Ingest job from URL |
 | POST | `/api/v1/jobs/bulk` | Bulk ingest jobs |
 | PATCH | `/api/v1/jobs/bulk/status` | Bulk status update |
+| GET | `/api/v1/jobs/descriptions/stats` | Get description completeness stats |
+| GET | `/api/v1/jobs/descriptions/incomplete` | List jobs needing full descriptions |
 | GET | `/api/v1/jobs/{id}` | Get job details |
 | PATCH | `/api/v1/jobs/{id}` | Update job |
 | PATCH | `/api/v1/jobs/{id}/status` | Update status |
 | DELETE | `/api/v1/jobs/{id}` | Soft delete job |
+| POST | `/api/v1/jobs/{id}/analyze` | **AI analysis with RAG coaching** |
+| POST | `/api/v1/jobs/{id}/notes` | Add note to job |
+| GET | `/api/v1/jobs/{id}/notes` | List job notes (filterable by type) |
 | POST | `/api/v1/jobs/{id}/cover-letter` | Generate cover letter |
 | GET | `/api/v1/jobs/{id}/cover-letters` | List job cover letters |
+
+### Analysis Endpoint
+
+```bash
+# Always use apply_suggestions=true
+POST /api/v1/jobs/{id}/analyze?apply_suggestions=true
+
+# Parameters:
+# - apply_suggestions (bool, required=true): Apply results to job record
+# - use_ai (bool, default=true): Use Claude for semantic analysis
+# - use_rag (bool, default=true): Use Sparkles RAG for coaching insights
+```
+
+### Note Types
+
+| Type | Description |
+|------|-------------|
+| `ai_analysis_summary` | Overall recommendation with score |
+| `strengths` | Key strengths for the role |
+| `watch_outs` | Red flags or concerns |
+| `talking_points` | Interview preparation points |
+| `study_recommendations` | Skills to brush up on |
+| `coaching_notes` | What to emphasize in applications |
+| `rag_evidence` | Evidence from career documents |
+| `general` | User-created notes |
 
 ### Cover Letters
 
@@ -179,7 +216,9 @@ meridian-job-tracker/
 
 ## Documentation
 
-- **[ELEGANT_JOB_TRACKER_PROJECT.md](ELEGANT_JOB_TRACKER_PROJECT.md)** - Comprehensive project documentation
+- **[docs/ANALYSIS_SYSTEM.md](docs/ANALYSIS_SYSTEM.md)** - AI analysis with RAG coaching (start here)
+- **[CLAUDE.md](CLAUDE.md)** - Claude Code agent rules and workflows
+- **[AGENTS.md](AGENTS.md)** - AI agent integration guide
 - `docs/api-reference.md` - Full API reference
 - `docs/agent-integration.md` - AI agent workflows
 - `docs/mcp-integration.md` - LinkedIn MCP integration
@@ -218,12 +257,23 @@ Resume data adapts to target role:
 
 ### Backend (`.env`)
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `API_KEY` | API authentication key |
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `RESUME_DATA_PATH` | Path to Meridian resume data |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `API_KEY` | Yes | API authentication key |
+| `ANTHROPIC_API_KEY` | Yes | Claude API key (for AI analysis) |
+| `OPENAI_API_KEY` | For RAG | OpenAI API key (for embeddings) |
+| `SPARKLES_SUPABASE_URL` | For RAG | Sparkles Supabase URL |
+| `SPARKLES_SUPABASE_SERVICE_KEY` | For RAG | Sparkles service role key |
+| `RESUME_DATA_PATH` | Optional | Path to Meridian resume data |
+
+### RAG Settings (Optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RAG_SIMILARITY_THRESHOLD` | 0.5 | Minimum similarity for matches |
+| `RAG_MAX_RESULTS` | 8 | Max results per search |
+| `RAG_TIMEOUT_SECONDS` | 5 | RAG request timeout |
 
 ### Frontend (`.env.local`)
 

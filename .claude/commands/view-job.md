@@ -83,6 +83,8 @@ Use `/edit-job` skill to update with full description:
 | `priority` | 0-100 fit score |
 | `is_easy_apply` | Easy Apply available |
 | `is_ai_forward` | AI-forward company |
+| `ai_confidence` | AI-forward confidence (0-1) |
+| `is_location_compatible` | Location compatible with GA |
 | `is_favorite` | Marked as favorite |
 | `is_perfect_fit` | Marked as perfect fit |
 | `work_location_type` | remote, hybrid, on_site |
@@ -92,7 +94,18 @@ Use `/edit-job` skill to update with full description:
 | `source_url` | Full job URL |
 | `posted_at` | When job was posted |
 | `applied_at` | When you applied |
+| `notes` | Array of typed notes (see below) |
 | `contact_count` | Number of linked contacts |
+
+## View Notes
+
+```bash
+# List all notes
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}/notes" | jq
+
+# Filter by type (talking_points, strengths, watch_outs, etc.)
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}/notes?note_type=talking_points" | jq
+```
 
 ## List Jobs with Completeness Status
 
@@ -108,7 +121,17 @@ curl -s "http://localhost:8000/api/v1/jobs?limit=20" | jq '.items[] | {
 ## Find Incomplete Jobs
 
 ```bash
+# Use the dedicated endpoint (recommended)
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/incomplete?limit=20" | jq
+
+# Or filter manually
 curl -s "http://localhost:8000/api/v1/jobs?limit=100" | jq '[.items[] | select((.description_raw | length) < 500)] | .[] | {id, title, company, desc_len: (.description_raw | length)}'
+```
+
+## Description Statistics
+
+```bash
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/stats" | jq
 ```
 
 ## Arguments

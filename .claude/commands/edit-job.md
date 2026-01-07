@@ -96,6 +96,22 @@ PATCH `http://localhost:8000/api/v1/jobs/{job_id}`
 | `is_perfect_fit` | bool | Marked as perfect fit |
 | `is_ai_forward` | bool | AI-forward company |
 
+## Typed Notes (Separate API)
+
+Jobs also have typed notes accessed via a separate endpoint:
+
+```bash
+# List all notes
+curl -s "http://localhost:8000/api/v1/jobs/{job_id}/notes" | jq
+
+# Add a note
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{job_id}/notes" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Note content", "note_type": "talking_points", "source": "user"}' | jq
+```
+
+Note types: `general`, `ai_analysis_summary`, `strengths`, `watch_outs`, `talking_points`, `study_recommendations`, `coaching_notes`, `rag_evidence`
+
 ## Usage Examples
 
 ### Update Salary

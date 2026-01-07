@@ -25,21 +25,26 @@
 │  ┌──────┴────────────────┴────────────────┴──────┐             │
 │  │              Service Layer                     │             │
 │  ├────────────────────────────────────────────────┤             │
-│  │ • Resume Service    • Cover Letter Service     │             │
-│  │ • JD Analyzer       • LinkedIn Automation      │             │
-│  └────────────────────────┬───────────────────────┘             │
-│                           │                                     │
-│  ┌────────────────────────┴───────────────────────┐             │
+│  │ • AI Analysis Service   • Cover Letter Service │             │
+│  │ • Sparkles RAG Client   • Location Service     │             │
+│  │ • JD Analyzer           • Description Fetcher  │             │
+│  │ • Resume Service        • Analysis Cache       │             │
+│  │ • Note Service (typed)  • Contact Service      │             │
+│  └─────────────┬──────────────────┬───────────────┘             │
+│                │                  │                             │
+│  ┌─────────────┴──────────────────┴───────────────┐             │
 │  │         SQLAlchemy Async ORM                   │             │
 │  └────────────────────────┬───────────────────────┘             │
 └───────────────────────────┼─────────────────────────────────────┘
                             │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    PostgreSQL Database                          │
-├─────────────────────────────────────────────────────────────────┤
-│  jobs │ cover_letters │ emails │ application_attempts          │
-└─────────────────────────────────────────────────────────────────┘
+         ┌──────────────────┼──────────────────┐
+         │                  │                  │
+         ▼                  ▼                  ▼
+┌─────────────────┐  ┌──────────────┐  ┌─────────────────┐
+│ PostgreSQL      │  │ Sparkles RAG │  │ External APIs   │
+│ Database        │  │ (Supabase)   │  │ • Claude (AI)   │
+│                 │  │ 260+ docs    │  │ • OpenAI (embed)│
+└─────────────────┘  └──────────────┘  └─────────────────┘
 ```
 
 ## Component Architecture
@@ -135,6 +140,35 @@ User → Dashboard → POST /api/jobs/{id}/cover-letter
                             Database
 ```
 
+### AI Analysis Flow
+
+```
+User → POST /api/jobs/{id}/analyze?apply_suggestions=true
+                                │
+                                ▼
+                         Check Description
+                      (min 500 chars required)
+                                │
+                    ┌───────────┴───────────┐
+                    ▼                       ▼
+             JD Analyzer              Sparkles RAG
+          (extract requirements)   (match career docs)
+                    │                       │
+                    └───────────┬───────────┘
+                                ▼
+                         Claude AI
+                    (semantic analysis +
+                     coaching insights)
+                                │
+                                ▼
+                    ┌───────────┴───────────┐
+                    │                       │
+                    ▼                       ▼
+              Update Job Fields      Generate Typed Notes
+            (priority, ai_forward,   (summary, strengths,
+             target_role, etc.)      watch_outs, etc.)
+```
+
 ### LinkedIn Automation Flow
 
 ```
@@ -172,20 +206,20 @@ Claude CLI → POST /api/jobs/{id}/apply → Backend
 │ title               │   │   │ job_id (FK)         │───┐
 │ company             │   │   │ content             │   │
 │ location            │   │   │ target_role         │   │
-│ url                 │   │   │ is_approved         │   │
+│ work_location_type  │   │   │ is_approved         │   │
 │ description_raw     │   │   │ created_at          │   │
 │ status              │   │   └─────────────────────┘   │
 │ target_role         │   │                             │
 │ priority            │   │   ┌─────────────────────┐   │
-│ notes               │   │   │       emails        │   │
-│ tags                │   │   ├─────────────────────┤   │
-│ applied_at          │   └──▶│ id (PK)             │   │
-│ created_at          │       │ job_id (FK)         │◀──┘
-│ updated_at          │       │ from_email          │
-│ deleted_at          │       │ subject             │
-└─────────────────────┘       │ body                │
-         │                    │ timestamp           │
-         │                    └─────────────────────┘
+│ is_ai_forward       │   │   │       emails        │   │
+│ ai_confidence       │   │   ├─────────────────────┤   │
+│ is_location_compat  │   └──▶│ id (PK)             │   │
+│ is_easy_apply       │       │ job_id (FK)         │◀──┘
+│ source / source_id  │       │ from_email          │
+│ notes (JSON array)  │       │ subject             │
+│ applied_at          │       │ body                │
+│ created_at          │       │ timestamp           │
+└─────────────────────┘       └─────────────────────┘
          │
          │    ┌─────────────────────────┐
          │    │  application_attempts   │
@@ -199,6 +233,22 @@ Claude CLI → POST /api/jobs/{id}/apply → Backend
               │ created_at              │
               └─────────────────────────┘
 ```
+
+### Typed Notes (JSON Array in jobs.notes)
+
+```json
+[
+  {
+    "text": "**APPLY** (78/100) - Strong fit...",
+    "timestamp": "2025-01-07T04:00:00Z",
+    "source": "agent",
+    "note_type": "ai_analysis_summary",
+    "metadata": {"priority_score": 78}
+  }
+]
+```
+
+Note types: `general`, `ai_analysis_summary`, `strengths`, `watch_outs`, `talking_points`, `study_recommendations`, `coaching_notes`, `rag_evidence`
 
 ## Security Model
 

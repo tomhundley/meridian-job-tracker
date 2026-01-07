@@ -1,52 +1,73 @@
-# Job Discovery Statistics
+# Job Statistics
 
-Get statistics about discovered jobs and application status.
+Get statistics about jobs, descriptions, and application status.
 
-## Instructions
-
-View aggregate statistics about your job search progress.
-
-## API Endpoint
-
-GET `http://localhost:8000/api/v1/discovery/stats`
-
-## Usage
+## Quick Commands
 
 ```bash
+# Description completeness statistics
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/stats" | jq
+
+# Discovery statistics (if endpoint exists)
 curl -s "http://localhost:8000/api/v1/discovery/stats" | jq
 ```
 
-## Response Fields
+## Description Statistics
 
-- `total_jobs` - Total jobs in tracker
-- `by_status` - Count by each status
-  - saved, researching, ready_to_apply, applying
-  - applied, interviewing, offer
-  - rejected, withdrawn, archived
-- `linkedin_jobs` - Jobs from LinkedIn
-- `applied_jobs` - Total applications submitted
-- `easy_apply_jobs` - Jobs with Easy Apply
-- `application_rate` - Percentage of jobs applied to
+Shows job description completeness:
 
-## Example Response
+```bash
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/stats" | jq
+```
 
+Response:
 ```json
 {
-  "total_jobs": 45,
-  "by_status": {
-    "saved": 20,
-    "researching": 8,
-    "applied": 12,
-    "interviewing": 3,
-    "rejected": 2
-  },
-  "linkedin_jobs": 40,
-  "applied_jobs": 15,
-  "easy_apply_jobs": 25,
-  "application_rate": "37.5%"
+  "total_jobs": 62,
+  "with_descriptions": 60,
+  "complete_descriptions": 43,
+  "incomplete_descriptions": 17,
+  "missing_descriptions": 2,
+  "needs_fetch": 19,
+  "min_length_threshold": 500,
+  "target_length": 2000
 }
+```
+
+| Field | Description |
+|-------|-------------|
+| `total_jobs` | Total jobs in tracker |
+| `complete_descriptions` | Jobs with 2000+ char descriptions |
+| `incomplete_descriptions` | Jobs with < 500 char descriptions |
+| `needs_fetch` | Jobs needing browser automation to fetch full description |
+
+## List Incomplete Jobs
+
+```bash
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/incomplete?limit=20" | jq
+```
+
+## Job Count by Status
+
+```bash
+curl -s "http://localhost:8000/api/v1/jobs" | jq '{
+  total: .total,
+  by_status: (.items | group_by(.status) | map({(.[0].status): length}) | add)
+}'
+```
+
+## AI Analysis Statistics
+
+```bash
+curl -s "http://localhost:8000/api/v1/jobs?limit=100" | jq '{
+  total: .total,
+  analyzed: [.items[] | select(.priority != null)] | length,
+  ai_forward: [.items[] | select(.is_ai_forward == true)] | length,
+  location_compatible: [.items[] | select(.is_location_compatible == true)] | length,
+  avg_priority: ([.items[] | select(.priority != null) | .priority] | add / length)
+}'
 ```
 
 ## Arguments
 
-`/stats` - Show job discovery statistics
+`/stats` - Show job statistics including description completeness

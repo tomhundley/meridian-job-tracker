@@ -140,6 +140,138 @@ Response:
 }
 ```
 
+### Description Management
+
+`GET /jobs/descriptions/stats` (permission: `jobs:read`)
+
+Returns statistics about job description completeness:
+```json
+{
+  "total_jobs": 62,
+  "with_descriptions": 60,
+  "complete_descriptions": 43,
+  "incomplete_descriptions": 17,
+  "missing_descriptions": 2,
+  "needs_fetch": 19,
+  "min_length_threshold": 500,
+  "target_length": 2000
+}
+```
+
+`GET /jobs/descriptions/incomplete` (permission: `jobs:read`)
+
+List jobs needing full descriptions (< 500 chars):
+```bash
+curl "http://localhost:8005/api/v1/jobs/descriptions/incomplete?limit=10"
+```
+Response:
+```json
+[
+  {
+    "id": "uuid",
+    "title": "VP Engineering",
+    "company": "Acme",
+    "url": "https://linkedin.com/jobs/view/123",
+    "job_board": "linkedin",
+    "job_board_id": "123",
+    "description_length": 150,
+    "needs_fetch": true
+  }
+]
+```
+
+### Job Analysis
+
+`POST /jobs/{job_id}/analyze` (permission: `jobs:read`)
+
+**IMPORTANT: Always use `apply_suggestions=true`**
+
+```bash
+# Correct usage
+curl -X POST "http://localhost:8005/api/v1/jobs/{id}/analyze?apply_suggestions=true"
+```
+
+Parameters:
+- `apply_suggestions` (bool): Apply results to job record. **Always set to true.**
+- `use_ai` (bool, default=true): Use Claude for semantic analysis
+- `use_rag` (bool, default=true): Use Sparkles RAG for coaching insights
+
+Response:
+```json
+{
+  "is_ai_forward": true,
+  "ai_confidence": 0.85,
+  "suggested_priority": 78,
+  "suggested_role": "vp",
+  "is_location_compatible": true,
+  "location_notes": null,
+  "technologies_matched": ["Python", "AWS", "Kubernetes"],
+  "technologies_missing": ["Rust"],
+  "analysis_notes": "Strong match for VP role..."
+}
+```
+
+When `apply_suggestions=true`, the job record is updated with:
+- `priority` - Fit score (0-100)
+- `is_ai_forward` - AI-forward company detection
+- `target_role` - Suggested role
+- `is_location_compatible` - Location validation
+- `notes` - Multiple typed coaching notes (see Notes section)
+
+### Notes
+
+`GET /jobs/{job_id}/notes` (permission: `jobs:read`)
+
+List notes with optional filters:
+```bash
+# All notes
+curl "http://localhost:8005/api/v1/jobs/{id}/notes"
+
+# Filter by type
+curl "http://localhost:8005/api/v1/jobs/{id}/notes?note_type=talking_points"
+
+# Filter by source
+curl "http://localhost:8005/api/v1/jobs/{id}/notes?source=agent"
+```
+
+Response:
+```json
+[
+  {
+    "text": "**APPLY** (78/100)\n\nStrong fit...",
+    "timestamp": "2025-01-07T04:00:00Z",
+    "source": "agent",
+    "note_type": "ai_analysis_summary",
+    "metadata": {
+      "priority_score": 78,
+      "recommendation": "APPLY"
+    }
+  }
+]
+```
+
+Note types:
+- `general` - User-created notes
+- `ai_analysis_summary` - Overall recommendation with score
+- `strengths` - Key strengths for the role
+- `watch_outs` - Red flags or concerns
+- `talking_points` - Interview preparation points
+- `study_recommendations` - Skills to brush up on
+- `coaching_notes` - What to emphasize
+- `rag_evidence` - Evidence from career documents
+
+`POST /jobs/{job_id}/notes` (permission: `jobs:write`)
+```json
+{
+  "text": "Remember to mention MDSi experience",
+  "source": "user",
+  "note_type": "talking_points",
+  "metadata": null
+}
+```
+
+### Cover Letters
+
 `POST /jobs/{job_id}/cover-letter` (permission: `cover_letters:write`)
 ```json
 {

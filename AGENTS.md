@@ -1,140 +1,248 @@
-# Agent Notes
+# Agent Integration Guide
 
-This file is for AI agents working in this repo. Keep it concise and update when workflows change.
+Instructions for AI agents working with the Meridian Job Tracker. Keep concise and update when workflows change.
 
-> **Comprehensive Documentation**: See [ELEGANT_JOB_TRACKER_PROJECT.md](ELEGANT_JOB_TRACKER_PROJECT.md) for full project details, architecture, and implementation patterns.
+> **Detailed Documentation**: See [docs/ANALYSIS_SYSTEM.md](docs/ANALYSIS_SYSTEM.md) for full analysis system details.
 
 ## Part of the Meridian Ecosystem
 
-This project integrates with other Meridian ecosystem components. Central documentation for all projects is available at [trh-meridian/docs/projects](https://github.com/ElegantSoftwareSolutions/trh-meridian/tree/main/docs/projects).
+This project integrates with:
+- **[trh-meridian](https://github.com/ElegantSoftwareSolutions/trh-meridian)** - Resume site + Sparkles RAG (260+ career documents)
+- **[meridian-linkedIn](https://github.com/tomhundley/meridian-linkedIn)** - LinkedIn MCP Server
 
 ---
 
-## CRITICAL: Job Data Quality Rules
+## CRITICAL RULES
 
-**Every job MUST have complete data before analysis can work properly.**
+### Rule 1: Complete Descriptions Required
 
-### The Problem
-The job scraper uses `httpx` + `BeautifulSoup` which **cannot execute JavaScript**. LinkedIn and many job boards render descriptions via JavaScript, resulting in only ~150 characters from meta tags instead of 2000+ characters of actual content.
+**Every job MUST have `description_raw` > 500 characters (ideally 2000+) before analysis.**
 
-### Required Workflow for LinkedIn Jobs
+The job scraper uses `httpx` which cannot execute JavaScript. LinkedIn renders descriptions via JavaScript, resulting in only ~150 characters from meta tags.
 
-1. **NEVER rely solely on the `/ingest` API for LinkedIn jobs** - it will get truncated descriptions
-2. **ALWAYS use browser automation** (Chrome DevTools MCP or Playwright) to extract full job data
-3. **Verify description length** - must be 500+ characters for analysis to work, ideally 2000+
-4. **Run analysis AFTER confirming full description** - analysis fails silently with incomplete data
+**ALWAYS use browser automation** to extract full job descriptions.
 
-### Browser Automation Workflow
+### Rule 2: Always Apply Suggestions
+
+**ALWAYS use `apply_suggestions=true` when analyzing jobs.**
 
 ```bash
-# 1. Navigate to job page
-mcp__chrome-devtools__navigate_page or mcp__playwright__browser_navigate
+# CORRECT - always use this
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestions=true"
 
-# 2. Take snapshot to extract "About the job" section
-mcp__chrome-devtools__take_snapshot or mcp__playwright__browser_snapshot
+# WRONG - never do this
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze"
+```
 
-# 3. Write extracted data to JSON file (avoids shell escaping issues)
-Write to /tmp/{company}-update.json
+---
 
-# 4. PATCH the job with full data
-cat /tmp/file.json | curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{id}" \
+## Job Workflow
+
+### Step 1: Extract Job Data (Browser Automation Required)
+
+```bash
+# Navigate to job page
+mcp__chrome-devtools__navigate_page  # or mcp__playwright__browser_navigate
+
+# Take snapshot and extract "About the job" section
+mcp__chrome-devtools__take_snapshot  # or mcp__playwright__browser_snapshot
+
+# Write extracted data to JSON file (avoids shell escaping issues)
+Write to /tmp/{company}-job.json
+```
+
+### Step 2: Create/Update Job
+
+```bash
+# Create new job
+cat /tmp/job.json | curl -s -X POST "http://localhost:8000/api/v1/jobs" \
   -H "Content-Type: application/json" -d @-
 
-# 5. Run analysis ONLY after full description is confirmed
+# Or update existing job
+cat /tmp/update.json | curl -s -X PATCH "http://localhost:8000/api/v1/jobs/{id}" \
+  -H "Content-Type: application/json" -d @-
+```
+
+### Step 3: Run Analysis (Always with apply_suggestions=true)
+
+```bash
 curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestions=true"
 ```
 
-### Data Fields to Extract
-
-| Field | Required | Source |
-|-------|----------|--------|
-| `description_raw` | **YES** | "About the job" section (2000+ chars) |
-| `salary_min/max` | If shown | Salary badge or description |
-| `work_location_type` | YES | remote/hybrid/on_site badge |
-| `employment_type` | YES | full_time/contract/etc. |
-| `location` | YES | Location text |
-| `source_id` | YES | LinkedIn job ID from URL |
-| `source_url` | YES | Full LinkedIn URL |
-| `is_easy_apply` | YES | Easy Apply badge present |
-
-### Validation Checklist
-
-Before marking a job as "complete":
-- [ ] `description_raw` length > 500 characters (ideally 2000+)
-- [ ] `source_url` is set
-- [ ] `source_id` is set
-- [ ] `work_location_type` is set
-- [ ] Analysis has been run with `apply_suggestions=true`
-
-### Common Patterns
-
-**Recruiting firms** (job is via intermediary):
-- Staffing Science, Albert Bow, Wellington Steele, BrainWorks, Jobgether, etc.
-- Still extract full description - contains actual role details
-- Note the actual hiring company if mentioned
-
-**Company pages unavailable**:
-- Search LinkedIn with company name in quotes: `"Company Name"`
-- Use job ID from existing `source_url` if available
+This updates:
+- `priority` - Fit score (0-100)
+- `is_ai_forward` - AI-forward company detection
+- `ai_confidence` - Confidence score (0-1)
+- `target_role` - Suggested role (cto/vp/director/architect/developer)
+- `is_location_compatible` - Location validation for GA-based candidate
+- `notes` - Multiple typed coaching notes
 
 ---
 
-## Project Overview
-- Backend: FastAPI + async SQLAlchemy (`backend/src`)
-- Frontend: Next.js 15 (`frontend/`)
-- Database: PostgreSQL via Docker (`database/`)
-- Auth: `X-API-Key` header (admin key in `settings.api_key`; agent keys via `/api/v1/agents`)
+## Required Data Fields
 
-## Key Commands
-Backend:
+| Field | Required | How to Extract |
+|-------|----------|----------------|
+| `title` | YES | Job header |
+| `company` | YES | Company link |
+| `description_raw` | YES | "About the job" section (2000+ chars) |
+| `location` | YES | Location badge |
+| `work_location_type` | YES | remote/hybrid/on_site badge |
+| `employment_type` | YES | full_time/contract/etc |
+| `source` | YES | "linkedin" or other |
+| `source_id` | YES | Job ID from URL |
+| `source_url` | YES | Full URL |
+| `is_easy_apply` | YES | Easy Apply badge present |
+| `salary_min/max` | If shown | Salary badge |
+
+---
+
+## Typed Notes System
+
+Analysis generates multiple categorized notes automatically:
+
+| Note Type | Content |
+|-----------|---------|
+| `ai_analysis_summary` | Overall recommendation (APPLY/SKIP) with score |
+| `strengths` | Key strengths for this role |
+| `watch_outs` | Red flags or concerns |
+| `talking_points` | Interview preparation points |
+| `study_recommendations` | Skills to brush up on |
+| `coaching_notes` | What to emphasize in applications |
+| `rag_evidence` | Evidence from career documents |
+
+### Filter Notes by Type
+
 ```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-python -m src.main
-pytest
+# Get all notes
+curl -s "http://localhost:8000/api/v1/jobs/{id}/notes"
+
+# Filter by type
+curl -s "http://localhost:8000/api/v1/jobs/{id}/notes?note_type=talking_points"
+
+# Filter by source
+curl -s "http://localhost:8000/api/v1/jobs/{id}/notes?source=agent"
 ```
 
-Frontend:
+### Add a Note
+
 ```bash
-cd frontend
-npm install
-npm run dev
-npm run test
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/notes" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Remember to mention the MDSi experience",
+    "source": "user",
+    "note_type": "talking_points"
+  }'
 ```
 
-Database:
+---
+
+## RAG Integration (Sparkles)
+
+RAG is enabled by default. The system matches job requirements against 260+ career documents from Sparkles.
+
+### Check RAG Status
+
 ```bash
-cd database
-docker-compose up -d
+# Get description statistics
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/stats"
+
+# Returns:
+# {
+#   "total_jobs": 62,
+#   "complete_descriptions": 43,
+#   "incomplete_descriptions": 19,
+#   "needs_fetch": 19
+# }
 ```
 
-## Environment
-Backend `.env`:
-- `DATABASE_URL` (asyncpg connection string)
-- `API_KEY` (admin key)
-- `ANTHROPIC_API_KEY` (cover letters)
-- `RESUME_DATA_PATH` (Meridian resume data)
+### List Incomplete Jobs
 
-Frontend `.env.local`:
-- `BACKEND_URL`
+```bash
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/incomplete?limit=10"
+```
 
-## Tests
-- Backend tests use the main database with transaction rollback for isolation.
-- Frontend uses Vitest (`frontend/vitest.config.ts`).
+### Disable RAG (Rarely Needed)
 
-## Important Files
-- API routes: `backend/src/api/routes/*`
-- Auth/permissions: `backend/src/api/deps.py`
-- Job scraper: `backend/src/services/job_scraper.py`
-- Models: `backend/src/models/*`
-- Migrations: `backend/alembic/*` (keep in sync with `database/init.sql`)
-- Docs: `docs/api-reference.md`, `docs/agent-integration.md`
+```bash
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestions=true&use_rag=false"
+```
 
-## API Permissions (Suggested)
-- jobs:read, jobs:write, jobs:ingest, jobs:update_status, jobs:delete
-- cover_letters:read, cover_letters:write, cover_letters:approve, cover_letters:delete
-- emails:read, emails:write, emails:delete
-- webhooks:read, webhooks:write
-- agents:write
+---
+
+## Location Validation
+
+The system validates job locations for a GA-based candidate:
+
+- **Remote US** with state restrictions → Checks if GA is allowed
+- **Remote US** without restrictions → Compatible
+- **Hybrid/On-site** anywhere in US → Compatible (candidate travels)
+
+When location is incompatible:
+- Sets `is_location_compatible = false`
+- Sets `status = archived`
+- Adds explanation to `decline_notes`
+
+---
+
+## API Quick Reference
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /jobs` | Create job |
+| `PATCH /jobs/{id}` | Update job |
+| `POST /jobs/{id}/analyze?apply_suggestions=true` | **Run AI analysis** |
+| `GET /jobs/{id}/notes` | List notes |
+| `POST /jobs/{id}/notes` | Add note |
+| `GET /jobs/descriptions/stats` | Description statistics |
+| `GET /jobs/descriptions/incomplete` | Jobs needing descriptions |
+
+---
+
+## Environment Variables
+
+```bash
+# Required
+DATABASE_URL=postgresql+asyncpg://...
+API_KEY=your-api-key
+ANTHROPIC_API_KEY=sk-ant-...
+
+# For RAG (from meridian/.env.local)
+OPENAI_API_KEY=sk-proj-...
+SPARKLES_SUPABASE_URL=https://xxx.supabase.co
+SPARKLES_SUPABASE_SERVICE_KEY=eyJ...
+```
+
+---
+
+## Common Patterns
+
+### Recruiting Firms
+
+Jobs posted by staffing agencies (Staffing Science, Albert Bow, BrainWorks, etc.):
+- Still extract full description - contains actual role details
+- Note the actual hiring company if mentioned in description
+
+### Verifying Description Completeness
+
+```bash
+curl -s "http://localhost:8000/api/v1/jobs/{id}" | jq '{
+  title,
+  company,
+  desc_len: (.description_raw | length),
+  analyzed: (.priority != null)
+}'
+```
+
+If `desc_len < 500`: Job needs full description via browser automation.
+
+---
+
+## Key Files
+
+- `backend/src/services/ai_analysis_service.py` - AI analysis + coaching
+- `backend/src/services/sparkles_client.py` - RAG integration
+- `backend/src/services/location_service.py` - Location validation
+- `backend/src/schemas/job_note.py` - Note types
+- `docs/ANALYSIS_SYSTEM.md` - Full documentation
