@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.config.database import Base
@@ -66,6 +66,10 @@ class CoverLetter(Base):
     # Approval status
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # RAG context tracking
+    rag_evidence: Mapped[list[dict] | None] = mapped_column(JSONB, default=None)
+    rag_context_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Soft delete
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -17,6 +17,9 @@ from .job import (
     ApplicationMethod,
     WorkLocationType,
     EmploymentType,
+    BatchAnalyzeRequest,
+    BatchAnalyzeResponse,
+    BatchAnalyzeJobResult,
 )
 from .cover_letter import (
     CoverLetterCreate,
@@ -67,6 +70,9 @@ __all__ = [
     "ApplicationMethod",
     "WorkLocationType",
     "EmploymentType",
+    "BatchAnalyzeRequest",
+    "BatchAnalyzeResponse",
+    "BatchAnalyzeJobResult",
     # Cover letter schemas
     "CoverLetterCreate",
     "CoverLetterResponse",

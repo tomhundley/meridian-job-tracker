@@ -9,6 +9,21 @@ interface NoteEntry {
   text: string;
   timestamp: string;
   source: "user" | "agent";
+  note_type?: string;
+}
+
+/**
+ * Check if a note is a user note (should be shown in JobNotes component).
+ * User notes are: source === "user" OR note_type is "general" or undefined.
+ * Analysis notes (source === "agent" with specific note_type) are shown in AnalysisInsightsPanel.
+ */
+function isUserNote(note: NoteEntry): boolean {
+  // User-created notes always show
+  if (note.source === "user") return true;
+  // General notes or notes without type show here
+  if (!note.note_type || note.note_type === "general") return true;
+  // Agent notes with specific analysis types go to AnalysisInsightsPanel
+  return false;
 }
 
 interface JobNotesProps {
@@ -73,8 +88,11 @@ export function JobNotes({ jobId, notes }: JobNotesProps) {
     }
   };
 
+  // Filter to only user notes (analysis notes shown in AnalysisInsightsPanel)
   const sortedNotes = notes
-    ? [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    ? [...notes]
+        .filter(isUserNote)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     : [];
 
   return (

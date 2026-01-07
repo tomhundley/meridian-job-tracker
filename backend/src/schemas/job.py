@@ -236,3 +236,58 @@ class JobAnalysisResponse(BaseModel):
     role_scores: list[RoleScoreResponse] | None = Field(None, description="Fit scores for each target role")
     is_location_compatible: bool = Field(True, description="Whether job location is compatible with user")
     location_notes: str | None = Field(None, description="Explanation of location compatibility")
+    cover_letter_id: UUID | None = Field(None, description="ID of auto-generated cover letter")
+
+
+class BatchAnalyzeRequest(BaseModel):
+    """Request schema for batch job analysis."""
+
+    limit: int = Field(
+        default=50,
+        ge=1,
+        le=100,
+        description="Maximum number of jobs to analyze (1-100)",
+    )
+    min_description_length: int = Field(
+        default=500,
+        ge=100,
+        description="Minimum description length to include job",
+    )
+    delay_seconds: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Delay between jobs for rate limiting",
+    )
+    auto_cover_letter: bool = Field(
+        default=False,
+        description="Auto-generate cover letter for each analyzed job",
+    )
+
+
+class BatchAnalyzeJobResult(BaseModel):
+    """Result for a single job in batch analysis."""
+
+    job_id: UUID
+    title: str
+    company: str
+    success: bool
+    priority: int | None = None
+    suggested_role: RoleType | None = None
+    cover_letter_id: UUID | None = None
+    error: str | None = None
+
+
+class BatchAnalyzeResponse(BaseModel):
+    """Response schema for batch job analysis."""
+
+    total_eligible: int = Field(..., description="Total jobs eligible for analysis")
+    processed: int = Field(..., description="Number of jobs processed")
+    successful: int = Field(..., description="Number of successful analyses")
+    failed: int = Field(..., description="Number of failed analyses")
+    cover_letters_generated: int = Field(
+        default=0, description="Number of cover letters generated"
+    )
+    results: list[BatchAnalyzeJobResult] = Field(
+        default_factory=list, description="Results for each job"
+    )

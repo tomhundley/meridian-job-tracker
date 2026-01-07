@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { vi } from "vitest";
 
 // Mock IntersectionObserver for infinite scroll tests
 class MockIntersectionObserver {

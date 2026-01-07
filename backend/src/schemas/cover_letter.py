@@ -1,6 +1,7 @@
 """Pydantic schemas for Cover Letter API."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,7 +19,21 @@ class CoverLetterBase(BaseModel):
 class CoverLetterCreate(CoverLetterBase):
     """Schema for generating a new cover letter."""
 
-    pass
+    tone: Literal["professional", "conversational"] = Field(
+        default="professional",
+        description="Tone of the cover letter: professional or conversational",
+    )
+
+
+class RAGEvidenceItem(BaseModel):
+    """Evidence item from RAG used in cover letter generation."""
+
+    requirement: str = Field(..., description="The job requirement being matched")
+    match_strength: Literal["strong", "moderate", "weak", "none"] = Field(
+        ..., description="Strength of the match"
+    )
+    evidence_snippet: str = Field(..., description="Evidence snippet from career documents")
+    source_document: str | None = Field(None, description="Source document name")
 
 
 class CoverLetterUpdate(BaseModel):
@@ -50,3 +65,9 @@ class CoverLetterResponse(BaseModel):
     is_current: bool
     is_approved: bool
     approved_at: datetime | None = None
+    rag_evidence: list[RAGEvidenceItem] | None = Field(
+        default=None, description="RAG evidence used in generation (if use_rag=true)"
+    )
+    rag_context_used: bool = Field(
+        default=False, description="Whether RAG context was used in generation"
+    )

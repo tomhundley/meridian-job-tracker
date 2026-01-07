@@ -27,6 +27,9 @@ from src.schemas import (
     WorkLocationType,
     CoverLetterCreate,
     CoverLetterResponse,
+    BatchAnalyzeRequest,
+    BatchAnalyzeResponse,
+    BatchAnalyzeJobResult,
 )
 from src.schemas.job_note import JobNoteCreate, JobNoteEntry, NoteSource, NoteType
 from src.services import (
@@ -781,6 +784,7 @@ async def analyze_job_fit(
     apply_suggestions: Annotated[bool, Query(description="Apply suggested priority and is_ai_forward to job")] = False,
     use_ai: Annotated[bool, Query(description="Use AI (Claude) for semantic analysis")] = True,
     use_rag: Annotated[bool, Query(description="Use RAG from Sparkles for coaching insights")] = True,
+    auto_cover_letter: Annotated[bool, Query(description="Auto-generate cover letter for suggested role")] = False,
 ) -> JobAnalysisResponse:
     """Analyze a job for fit and AI-forward status."""
     query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
@@ -887,6 +891,71 @@ async def analyze_job_fit(
 
         await db.flush()
 
+    # Auto-generate cover letter if requested and we have a suggested role
+    cover_letter_id = None
+    if auto_cover_letter and apply_suggestions and analysis.suggested_role:
+        from src.models import CoverLetter as CoverLetterModel
+        from src.services import cover_letter_service
+        from sqlalchemy import func as sqlfunc, update
+
+        try:
+            # Generate cover letter for suggested role
+            generation_result = await cover_letter_service.generate(
+                job=job,
+                target_role=ModelRoleType(analysis.suggested_role.value),
+                custom_instructions=None,
+                tone="professional",
+                use_rag=True,
+            )
+
+            # Get current version number
+            version_query = select(sqlfunc.coalesce(sqlfunc.max(CoverLetterModel.version), 0)).where(
+                CoverLetterModel.job_id == job_id,
+                CoverLetterModel.deleted_at.is_(None),
+            )
+            current_version = await db.scalar(version_query) or 0
+
+            # Mark existing cover letters as not current
+            await db.execute(
+                update(CoverLetterModel)
+                .where(CoverLetterModel.job_id == job_id, CoverLetterModel.is_current == True)
+                .values(is_current=False)
+            )
+
+            # Create new cover letter
+            cover_letter = CoverLetterModel(
+                job_id=job_id,
+                content=generation_result["content"],
+                target_role=generation_result["target_role"],
+                generation_prompt=generation_result["generation_prompt"],
+                model_used=generation_result["model_used"],
+                version=current_version + 1,
+                is_current=True,
+                rag_evidence=generation_result.get("rag_evidence"),
+                rag_context_used=generation_result.get("rag_context_used", False),
+            )
+            db.add(cover_letter)
+            await db.flush()
+            await db.refresh(cover_letter)
+            cover_letter_id = cover_letter.id
+
+            import structlog
+            logger = structlog.get_logger(__name__)
+            logger.info(
+                "auto_cover_letter_generated",
+                job_id=str(job_id),
+                cover_letter_id=str(cover_letter_id),
+                target_role=analysis.suggested_role.value,
+            )
+        except Exception as e:
+            import structlog
+            logger = structlog.get_logger(__name__)
+            logger.warning(
+                "auto_cover_letter_failed",
+                job_id=str(job_id),
+                error=str(e),
+            )
+
     # Convert role_scores to response format
     role_scores_response = None
     if analysis.role_scores:
@@ -913,6 +982,7 @@ async def analyze_job_fit(
         role_scores=role_scores_response,
         is_location_compatible=analysis.is_location_compatible,
         location_notes=analysis.location_notes,
+        cover_letter_id=cover_letter_id,
     )
 
 
@@ -1058,6 +1128,8 @@ async def generate_cover_letter(
             job=job,
             target_role=ModelRoleType(request.target_role.value),
             custom_instructions=request.custom_instructions,
+            tone=request.tone,
+            use_rag=True,
         )
     except ValueError as e:
         raise HTTPException(
@@ -1090,6 +1162,8 @@ async def generate_cover_letter(
         model_used=generation_result["model_used"],
         version=current_version + 1,
         is_current=True,
+        rag_evidence=generation_result.get("rag_evidence"),
+        rag_context_used=generation_result.get("rag_context_used", False),
     )
     db.add(cover_letter)
     await db.flush()
@@ -1119,3 +1193,237 @@ async def list_job_cover_letters(
     )
     result = await db.execute(query)
     return list(result.scalars().all())
+
+
+@router.post(
+    "/analyze-all",
+    response_model=BatchAnalyzeResponse,
+    summary="Batch analyze jobs",
+    description=(
+        "Analyze all jobs that don't have existing AI analysis notes.\n\n"
+        "Filters:\n"
+        "- Jobs without `ai_analysis_summary` note type\n"
+        "- Jobs with description > min_description_length\n"
+        "- Non-deleted jobs\n\n"
+        "Rate limited with configurable delay between jobs."
+    ),
+    dependencies=[Depends(require_permissions(["jobs:read"]))],
+)
+async def batch_analyze_jobs(
+    db: DbSession,
+    request: BatchAnalyzeRequest,
+) -> BatchAnalyzeResponse:
+    """Batch analyze jobs without existing analysis."""
+    import asyncio
+    import structlog
+    from src.models import CoverLetter as CoverLetterModel
+    from src.services import cover_letter_service
+    from sqlalchemy import func as sqlfunc, update
+
+    logger = structlog.get_logger(__name__)
+
+    # Find jobs without ai_analysis_summary notes and with sufficient description
+    # A job has analysis if its notes JSONB contains note_type='ai_analysis_summary'
+    query = (
+        select(Job)
+        .where(
+            Job.deleted_at.is_(None),
+            func.length(Job.description_raw) >= request.min_description_length,
+        )
+        .order_by(Job.created_at.desc())
+    )
+    result = await db.execute(query)
+    all_jobs = list(result.scalars().all())
+
+    # Filter out jobs that already have ai_analysis_summary
+    eligible_jobs = []
+    for job in all_jobs:
+        has_analysis = False
+        if job.notes:
+            for note in job.notes:
+                if isinstance(note, dict) and note.get("note_type") == "ai_analysis_summary":
+                    has_analysis = True
+                    break
+        if not has_analysis:
+            eligible_jobs.append(job)
+
+    # Limit to requested amount
+    jobs_to_process = eligible_jobs[: request.limit]
+
+    logger.info(
+        "batch_analyze_start",
+        total_eligible=len(eligible_jobs),
+        processing=len(jobs_to_process),
+        auto_cover_letter=request.auto_cover_letter,
+    )
+
+    results: list[BatchAnalyzeJobResult] = []
+    successful = 0
+    failed = 0
+    cover_letters_generated = 0
+
+    for i, job in enumerate(jobs_to_process):
+        try:
+            # Run analysis
+            analysis, ai_result = analyze_job_with_ai(job, use_ai=True)
+
+            # Apply suggestions
+            job.priority = analysis.suggested_priority
+            job.is_ai_forward = analysis.is_ai_forward
+            job.is_location_compatible = analysis.is_location_compatible
+            if analysis.suggested_role:
+                job.target_role = ModelRoleType(analysis.suggested_role.value)
+
+            # Auto-reject if location incompatible
+            if not analysis.is_location_compatible:
+                job.status = ModelJobStatus.ARCHIVED
+                existing_reasons = job.user_decline_reasons or []
+                if "location" not in existing_reasons:
+                    job.user_decline_reasons = existing_reasons + ["location"]
+                if analysis.location_notes:
+                    existing_notes = job.decline_notes or ""
+                    if existing_notes:
+                        job.decline_notes = f"{existing_notes}\n{analysis.location_notes}"
+                    else:
+                        job.decline_notes = analysis.location_notes
+
+            # Generate typed notes
+            if ai_result:
+                coaching_insights = None
+                requirement_matches = None
+
+                if sparkles_client.is_configured:
+                    try:
+                        from src.services.jd_analyzer import detect_and_parse_jd
+                        jd_result = detect_and_parse_jd(job.description_raw)
+                        requirements = (
+                            jd_result.requirements.must_have[:10] +
+                            jd_result.requirements.nice_to_have[:5]
+                        )
+                        if requirements:
+                            requirement_matches = await sparkles_client.match_jd_requirements(
+                                requirements=requirements,
+                                threshold=0.40,
+                                limit_per_req=3,
+                            )
+                            from src.schemas.ai_analysis_coach import CoachingInsights
+                            evidence_list = []
+                            for match in requirement_matches:
+                                for top_match in match.top_matches[:1]:
+                                    evidence_list.append(top_match)
+                            coaching_insights = CoachingInsights(
+                                talking_points=[],
+                                strengths_to_highlight=[],
+                                gaps_to_address=[],
+                                study_recommendations=[],
+                                watch_outs=[],
+                                evidence_from_resume=evidence_list,
+                            )
+                    except Exception as e:
+                        logger.warning("batch_rag_failed", job_id=str(job.id), error=str(e))
+
+                typed_notes = generate_typed_notes(
+                    ai_result=ai_result,
+                    coaching=coaching_insights,
+                    requirement_matches=requirement_matches,
+                )
+                existing_notes = job.notes or []
+                new_notes_dicts = [note.model_dump(mode="json") for note in typed_notes]
+                job.notes = existing_notes + new_notes_dicts
+
+            await db.flush()
+
+            # Auto-generate cover letter if requested
+            cover_letter_id = None
+            if request.auto_cover_letter and analysis.suggested_role:
+                try:
+                    generation_result = await cover_letter_service.generate(
+                        job=job,
+                        target_role=ModelRoleType(analysis.suggested_role.value),
+                        custom_instructions=None,
+                        tone="professional",
+                        use_rag=True,
+                    )
+
+                    version_query = select(sqlfunc.coalesce(sqlfunc.max(CoverLetterModel.version), 0)).where(
+                        CoverLetterModel.job_id == job.id,
+                        CoverLetterModel.deleted_at.is_(None),
+                    )
+                    current_version = await db.scalar(version_query) or 0
+
+                    await db.execute(
+                        update(CoverLetterModel)
+                        .where(CoverLetterModel.job_id == job.id, CoverLetterModel.is_current == True)
+                        .values(is_current=False)
+                    )
+
+                    cover_letter = CoverLetterModel(
+                        job_id=job.id,
+                        content=generation_result["content"],
+                        target_role=generation_result["target_role"],
+                        generation_prompt=generation_result["generation_prompt"],
+                        model_used=generation_result["model_used"],
+                        version=current_version + 1,
+                        is_current=True,
+                        rag_evidence=generation_result.get("rag_evidence"),
+                        rag_context_used=generation_result.get("rag_context_used", False),
+                    )
+                    db.add(cover_letter)
+                    await db.flush()
+                    await db.refresh(cover_letter)
+                    cover_letter_id = cover_letter.id
+                    cover_letters_generated += 1
+                except Exception as e:
+                    logger.warning("batch_cover_letter_failed", job_id=str(job.id), error=str(e))
+
+            results.append(BatchAnalyzeJobResult(
+                job_id=job.id,
+                title=job.title,
+                company=job.company,
+                success=True,
+                priority=analysis.suggested_priority,
+                suggested_role=RoleType(analysis.suggested_role.value) if analysis.suggested_role else None,
+                cover_letter_id=cover_letter_id,
+            ))
+            successful += 1
+
+            logger.info(
+                "batch_job_analyzed",
+                job_id=str(job.id),
+                title=job.title,
+                priority=analysis.suggested_priority,
+                progress=f"{i + 1}/{len(jobs_to_process)}",
+            )
+
+        except Exception as e:
+            results.append(BatchAnalyzeJobResult(
+                job_id=job.id,
+                title=job.title,
+                company=job.company,
+                success=False,
+                error=str(e),
+            ))
+            failed += 1
+            logger.error("batch_job_failed", job_id=str(job.id), error=str(e))
+
+        # Rate limit delay
+        if i < len(jobs_to_process) - 1:
+            await asyncio.sleep(request.delay_seconds)
+
+    logger.info(
+        "batch_analyze_complete",
+        total_eligible=len(eligible_jobs),
+        processed=len(jobs_to_process),
+        successful=successful,
+        failed=failed,
+        cover_letters_generated=cover_letters_generated,
+    )
+
+    return BatchAnalyzeResponse(
+        total_eligible=len(eligible_jobs),
+        processed=len(jobs_to_process),
+        successful=successful,
+        failed=failed,
+        cover_letters_generated=cover_letters_generated,
+        results=results,
+    )

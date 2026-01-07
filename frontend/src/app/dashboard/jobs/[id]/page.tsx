@@ -12,6 +12,7 @@ import { StatusPipeline } from "@/components/jobs/StatusPipeline";
 import { JobFlagsToggle } from "@/components/jobs/JobFlagsToggle";
 import { RolePriorityScores } from "@/components/jobs/RolePriorityScores";
 import { JobNotes } from "@/components/jobs/JobNotes";
+import { AnalysisInsightsPanel } from "@/components/jobs/AnalysisInsightsPanel";
 import { toast } from "sonner";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -41,6 +42,18 @@ interface NoteEntry {
   text: string;
   timestamp: string;
   source: "user" | "agent";
+  note_type?: "general" | "ai_analysis_summary" | "coaching_notes" | "talking_points" | "study_recommendations" | "strengths" | "watch_outs" | "rag_evidence";
+  metadata?: {
+    priority_score?: number;
+    recommendation?: string;
+    ai_forward?: boolean;
+    suggested_role?: string;
+    evidence_count?: number;
+    strong_count?: number;
+    gap_count?: number;
+    location_incompatible?: boolean;
+    [key: string]: unknown;
+  } | null;
 }
 
 interface Job {
@@ -535,6 +548,14 @@ export default function JobDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Analysis Insights Panel */}
+          <AnalysisInsightsPanel
+            jobId={id}
+            notes={job.notes}
+            priority={job.priority}
+            isAiForward={job.is_ai_forward}
+          />
 
           {/* Notes */}
           <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
