@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     # Anthropic API
     anthropic_api_key: str = ""
 
+    # OpenAI API (for embeddings in RAG)
+    openai_api_key: str = ""
+
+    # Sparkles RAG Configuration (Supabase)
+    sparkles_supabase_url: str = ""
+    sparkles_supabase_service_key: str = ""
+
+    # RAG Settings
+    rag_similarity_threshold: float = 0.5
+    rag_max_results: int = 8
+    rag_timeout_seconds: int = 5
+
     # LinkedIn Credentials (for browser automation)
     linkedin_email: str = ""
     linkedin_password: str = ""

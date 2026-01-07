@@ -14,7 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.config.database import Base
@@ -155,7 +155,7 @@ class Job(Base):
 
     # Priority and organization
     priority: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
-    notes: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[list[dict] | None] = mapped_column(JSONB, default=list)
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
 
     # Job posting date (when posted on job board)
@@ -168,6 +168,9 @@ class Job(Base):
     is_favorite: Mapped[bool] = mapped_column(default=False, nullable=False)
     is_perfect_fit: Mapped[bool] = mapped_column(default=False, nullable=False)
     is_ai_forward: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # Location compatibility (for remote jobs with state restrictions)
+    is_location_compatible: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     # Application details
     application_method: Mapped[ApplicationMethod | None] = mapped_column(

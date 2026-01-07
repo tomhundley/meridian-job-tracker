@@ -65,17 +65,107 @@ curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestion
 | `salary_currency` | "USD" typically |
 | `posted_at` | When job was posted |
 
-## Analysis Requirements
+## Analysis Requirements - MANDATORY
+
+### The Analysis Rule
+
+**ALWAYS run analysis with `apply_suggestions=true`.** This is not optional.
+
+```bash
+# CORRECT - always use this
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestions=true"
+
+# WRONG - never analyze without applying suggestions
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze"
+```
 
 The job analysis endpoint (`/analyze`) requires:
 - `description_raw` > 500 characters to generate meaningful results
 - Without sufficient description, analysis returns low-confidence defaults
 
-Always use `apply_suggestions=true` to auto-update:
+With `apply_suggestions=true`, the system auto-updates:
 - `is_ai_forward` - Whether company/role is AI-forward
 - `ai_confidence` - Confidence score (0-1)
 - `priority` - Fit score (0-100)
 - `target_role` - Suggested role (cto/vp/director/architect/developer)
+- `is_location_compatible` - Whether job location is compatible with user
+- `notes` - Multiple typed notes with coaching insights
+
+### RAG-Enhanced Analysis
+
+RAG is enabled by default (`use_rag=true`). The system fetches context from Sparkles career documents (260+ documents) to provide personalized coaching:
+
+```bash
+# Standard analysis (RAG enabled by default)
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestions=true"
+
+# Explicitly enable RAG (same as above)
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestions=true&use_rag=true"
+
+# Disable RAG (rarely needed)
+curl -s -X POST "http://localhost:8000/api/v1/jobs/{id}/analyze?apply_suggestions=true&use_rag=false"
+```
+
+### Typed Notes
+
+Analysis with `apply_suggestions=true` generates multiple categorized notes:
+
+| Note Type | Purpose |
+|-----------|---------|
+| `ai_analysis_summary` | Overall recommendation (APPLY/SKIP/etc) with score |
+| `strengths` | Key strengths identified in the match |
+| `watch_outs` | Red flags or concerns |
+| `talking_points` | Interview preparation points |
+| `study_recommendations` | Skills/topics to brush up on |
+| `coaching_notes` | What to emphasize in applications |
+| `rag_evidence` | Evidence from career documents |
+
+Filter notes by type:
+```bash
+curl -s "http://localhost:8000/api/v1/jobs/{id}/notes?note_type=talking_points"
+```
+
+### Incomplete Descriptions
+
+Check for jobs needing full descriptions:
+```bash
+# Get statistics
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/stats"
+
+# List incomplete jobs
+curl -s "http://localhost:8000/api/v1/jobs/descriptions/incomplete?limit=10"
+```
+
+## User Location & Validation
+
+### User Location
+- **State**: Georgia (GA)
+- **City**: Alpharetta
+- **Travel**: Willing to travel anywhere in the US for hybrid/on-site roles
+
+### Location Validation Rules
+
+When analyzing jobs with `apply_suggestions=true`:
+
+1. **Remote jobs**: Check if location allows Georgia
+   - "Remote US (CT, MA, NH, NJ, NY)" → **Incompatible** (GA not listed)
+   - "Remote US" or "Remote" → **Compatible** (all states allowed)
+
+2. **Hybrid/On-site jobs**: Always **Compatible** (user travels anywhere US)
+
+3. **Auto-rejection behavior** (when location incompatible):
+   - Sets `is_location_compatible = false`
+   - Sets `status = archived`
+   - Adds `location_restricted` to `user_decline_reasons`
+   - Adds explanation to `decline_notes`
+
+### Location String Patterns
+
+The location service parses these formats:
+- `"Remote US (CT, MA, NH, NJ, NY)"` → Requires one of: CT, MA, NH, NJ, NY
+- `"Remote - CT, MA, NH, NJ, NY only"` → Same as above
+- `"Remote in: CT | MA | NH"` → Same pattern with pipe separator
+- `"Remote US"` or `"Fully Remote"` → All states allowed
 
 ## Shell Command Patterns
 

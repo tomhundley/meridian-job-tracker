@@ -2,13 +2,21 @@
 
 from dataclasses import dataclass
 
+import structlog
+
+from src.config import settings
+from src.models import Job
 from src.models.job import RoleType
+from src.schemas.ai_analysis import AIJobAnalysisResult, Recommendation
 from src.services.jd_analyzer import (
     detect_and_parse_jd,
     extract_technologies,
     JDAnalysisResult,
 )
+from src.services.location_service import validate_location_compatibility
 from src.services.resume_service import resume_service
+
+logger = structlog.get_logger(__name__)
 
 
 # AI/ML technologies that indicate an AI-forward company
@@ -52,12 +60,16 @@ class JobAnalysisResult:
     seniority_level: str | None
     analysis_notes: list[str]
     role_scores: list[RoleScore] | None = None  # Scores for each role
+    is_location_compatible: bool = True  # Location compatible with user
+    location_notes: str | None = None  # Explanation if incompatible
 
 
 def analyze_job(
     description: str,
     title: str | None = None,
     company: str | None = None,
+    location: str | None = None,
+    work_location_type: str | None = None,
 ) -> JobAnalysisResult:
     """
     Analyze a job posting to determine AI-forward status and fit.
@@ -107,6 +119,11 @@ def analyze_job(
         is_ai_forward,
     )
 
+    # Validate location compatibility
+    location_result = validate_location_compatibility(location, work_location_type)
+    if not location_result.is_compatible:
+        notes.append(f"LOCATION INCOMPATIBLE: {location_result.reason}")
+
     return JobAnalysisResult(
         is_ai_forward=is_ai_forward,
         ai_confidence=ai_confidence,
@@ -118,6 +135,8 @@ def analyze_job(
         seniority_level=jd_result.requirements.seniority_level,
         analysis_notes=notes,
         role_scores=role_scores,
+        is_location_compatible=location_result.is_compatible,
+        location_notes=location_result.reason,
     )
 
 
@@ -182,19 +201,35 @@ def _get_my_skills() -> set[str]:
 
 def _suggest_role(title: str | None, jd_result: JDAnalysisResult) -> RoleType | None:
     """Suggest the best role type based on job title and requirements."""
+    import re
+
     if not title:
         return None
 
     title_lower = title.lower()
 
-    # Check for explicit role matches
-    if any(kw in title_lower for kw in ["cto", "chief technology", "chief technical"]):
+    def word_match(keywords: list[str]) -> bool:
+        """Check if any keyword matches as a word boundary (not substring)."""
+        for kw in keywords:
+            # Use word boundary for short keywords to avoid substring matches
+            # e.g., "cto" shouldn't match "director"
+            if len(kw) <= 4:
+                if re.search(rf"\b{re.escape(kw)}\b", title_lower):
+                    return True
+            else:
+                # Longer keywords can use simple contains
+                if kw in title_lower:
+                    return True
+        return False
+
+    # Check for explicit role matches (order matters - more specific first)
+    if word_match(["cto", "chief technology", "chief technical"]):
         return RoleType.CTO
-    if any(kw in title_lower for kw in ["vp ", "vice president", "svp ", "evp ", "managing director"]):
+    if word_match(["vp ", "vice president", "svp ", "evp ", "managing director"]):
         return RoleType.VP
-    if any(kw in title_lower for kw in ["director", "head of"]):
+    if word_match(["director", "head of"]):
         return RoleType.DIRECTOR
-    if any(kw in title_lower for kw in ["architect", "principal"]):
+    if word_match(["architect", "principal"]):
         return RoleType.ARCHITECT
 
     # Check seniority from JD analysis
@@ -299,6 +334,71 @@ ROLE_ALIGNMENT_MATRIX = {
 }
 
 
+def _convert_ai_to_legacy(ai_result: AIJobAnalysisResult) -> JobAnalysisResult:
+    """Convert AI analysis result to legacy JobAnalysisResult format."""
+    # Convert role scores
+    role_scores = [
+        RoleScore(
+            role=score.role,
+            score=score.score,
+            label=ROLE_LABELS.get(score.role, score.role.value),
+        )
+        for score in ai_result.role_scores
+    ]
+
+    # Build analysis notes from AI insights
+    notes = []
+
+    # Add recommendation as first note
+    rec_map = {
+        Recommendation.STRONG_APPLY: "STRONG FIT: Apply immediately",
+        Recommendation.APPLY: "Good fit: Worth applying",
+        Recommendation.RESEARCH_MORE: "Moderate fit: Research more",
+        Recommendation.SKIP: "POOR FIT: Consider skipping",
+    }
+    notes.append(rec_map.get(ai_result.overall_assessment.recommendation, ""))
+
+    # Add summary
+    if ai_result.overall_assessment.summary:
+        notes.append(ai_result.overall_assessment.summary)
+
+    # Add key strengths
+    for strength in ai_result.overall_assessment.key_strengths[:3]:
+        notes.append(f"✓ {strength}")
+
+    # Add key concerns
+    for concern in ai_result.overall_assessment.key_concerns[:3]:
+        notes.append(f"⚠ {concern}")
+
+    # Add AI forward assessment
+    if ai_result.ai_forward_assessment.is_ai_forward:
+        ai_type = ai_result.ai_forward_assessment.assessment_type.value.replace("_", " ").title()
+        notes.append(f"AI-forward: {ai_type}")
+
+    # Add location notes if incompatible
+    if not ai_result.location_assessment.is_compatible:
+        notes.append(f"LOCATION: {ai_result.location_assessment.notes or 'Incompatible'}")
+
+    # Combine skills from AI analysis
+    technologies_matched = ai_result.skills_alignment.strong_matches + ai_result.skills_alignment.partial_matches
+    technologies_missing = ai_result.skills_alignment.gaps
+
+    return JobAnalysisResult(
+        is_ai_forward=ai_result.ai_forward_assessment.is_ai_forward,
+        ai_confidence=ai_result.ai_forward_assessment.confidence,
+        suggested_priority=ai_result.overall_assessment.priority_score,
+        suggested_role=ai_result.role_classification.suggested_role,
+        technologies_matched=technologies_matched,
+        technologies_missing=technologies_missing,
+        years_experience_required=ai_result.experience_fit.years_required,
+        seniority_level=ai_result.experience_fit.seniority_match.value,
+        analysis_notes=notes,
+        role_scores=role_scores,
+        is_location_compatible=ai_result.location_assessment.is_compatible,
+        location_notes=ai_result.location_assessment.notes,
+    )
+
+
 def _calculate_role_scores(
     jd_result: JDAnalysisResult,
     title: str | None,
@@ -359,5 +459,67 @@ def _calculate_role_scores(
     return role_scores
 
 
-# Singleton instance
+def analyze_job_with_ai(
+    job: Job,
+    use_ai: bool = True,
+    use_cache: bool = True,
+) -> tuple[JobAnalysisResult, AIJobAnalysisResult | None]:
+    """
+    Analyze a job using AI when available, with rule-based fallback.
+
+    Args:
+        job: The Job model to analyze
+        use_ai: Whether to attempt AI analysis (default True)
+        use_cache: Whether to use cached AI results (default True)
+
+    Returns:
+        Tuple of (JobAnalysisResult, AIJobAnalysisResult or None)
+        Second element is None if rule-based analysis was used
+    """
+    ai_result = None
+
+    # Try AI analysis if enabled and API key configured
+    if use_ai and settings.anthropic_api_key and job.description_raw:
+        # Check cache first
+        if use_cache:
+            from src.services.analysis_cache import analysis_cache
+            cached = analysis_cache.get(str(job.id), job.description_raw)
+            if cached:
+                logger.info("ai_analysis_cache_hit", job_id=str(job.id))
+                return _convert_ai_to_legacy(cached), cached
+
+        # Try AI analysis
+        try:
+            from src.services.ai_analysis_service import ai_analysis_service
+            ai_result = ai_analysis_service.analyze(job)
+
+            # Cache the result
+            if use_cache:
+                from src.services.analysis_cache import analysis_cache
+                analysis_cache.set(str(job.id), job.description_raw, ai_result)
+
+            return _convert_ai_to_legacy(ai_result), ai_result
+
+        except Exception as e:
+            logger.warning(
+                "ai_analysis_fallback",
+                job_id=str(job.id),
+                error=str(e),
+                reason="AI analysis failed, using rule-based",
+            )
+
+    # Fall back to rule-based analysis
+    legacy_result = analyze_job(
+        description=job.description_raw or "",
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        work_location_type=job.work_location_type.value if job.work_location_type else None,
+    )
+
+    return legacy_result, None
+
+
+# Singleton instances
 job_analysis_service = analyze_job
+analyze_job_with_ai_service = analyze_job_with_ai

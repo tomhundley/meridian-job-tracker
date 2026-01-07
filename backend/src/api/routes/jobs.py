@@ -28,8 +28,16 @@ from src.schemas import (
     CoverLetterCreate,
     CoverLetterResponse,
 )
-from src.schemas.job_note import JobNoteCreate, JobNoteEntry, NoteSource
-from src.services import job_scraper, JobScrapeError, analyze_job, analyze_job_with_ai
+from src.schemas.job_note import JobNoteCreate, JobNoteEntry, NoteSource, NoteType
+from src.services import (
+    job_scraper,
+    JobScrapeError,
+    analyze_job,
+    analyze_job_with_ai,
+    sparkles_client,
+    generate_typed_notes,
+    description_fetcher,
+)
 
 router = APIRouter()
 
@@ -501,6 +509,52 @@ async def bulk_update_job_status(
     )
 
 
+@router.get(
+    "/descriptions/stats",
+    summary="Get description statistics",
+    description="Get statistics about job description completeness.",
+    dependencies=[Depends(require_permissions(["jobs:read"]))],
+)
+async def get_description_stats(
+    db: DbSession,
+) -> dict:
+    """Get statistics about job descriptions."""
+    return await description_fetcher.get_stats(db)
+
+
+@router.get(
+    "/descriptions/incomplete",
+    summary="List jobs with incomplete descriptions",
+    description=(
+        "Get jobs that need full descriptions fetched via browser automation.\n\n"
+        "Jobs with descriptions < 500 chars are considered incomplete.\n"
+        "Use browser automation to fetch full descriptions from the returned URLs."
+    ),
+    dependencies=[Depends(require_permissions(["jobs:read"]))],
+)
+async def list_incomplete_descriptions(
+    db: DbSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    min_chars: Annotated[int | None, Query(description="Override minimum character threshold")] = None,
+) -> list[dict]:
+    """List jobs needing full descriptions."""
+    incomplete = await description_fetcher.get_incomplete_jobs(db, limit=limit, min_chars=min_chars)
+
+    return [
+        {
+            "id": str(job.id),
+            "title": job.title,
+            "company": job.company,
+            "url": description_fetcher.build_fetch_url(job),
+            "job_board": job.job_board,
+            "job_board_id": job.job_board_id,
+            "description_length": job.description_length,
+            "needs_fetch": job.needs_fetch,
+        }
+        for job in incomplete
+    ]
+
+
 @router.post(
     "",
     response_model=JobResponse,
@@ -710,6 +764,8 @@ async def update_job_status(
         "Analyze a job to determine AI-forward status, fit score, and role suggestions.\n\n"
         "**AI Analysis:** When `use_ai=true` (default), uses Claude for semantic analysis.\n"
         "Falls back to rule-based analysis if AI unavailable.\n\n"
+        "**RAG Enhancement:** When `use_rag=true` (default), fetches context from Sparkles\n"
+        "career documents to provide personalized coaching insights.\n\n"
         "Returns:\n"
         "- **is_ai_forward**: Whether this is an AI-forward company/role\n"
         "- **ai_confidence**: Confidence score (0-1) for AI-forward detection\n"
@@ -724,6 +780,7 @@ async def analyze_job_fit(
     job_id: UUID,
     apply_suggestions: Annotated[bool, Query(description="Apply suggested priority and is_ai_forward to job")] = False,
     use_ai: Annotated[bool, Query(description="Use AI (Claude) for semantic analysis")] = True,
+    use_rag: Annotated[bool, Query(description="Use RAG from Sparkles for coaching insights")] = True,
 ) -> JobAnalysisResponse:
     """Analyze a job for fit and AI-forward status."""
     query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
@@ -767,6 +824,66 @@ async def analyze_job_fit(
                     job.decline_notes = f"{existing_notes}\n{analysis.location_notes}"
                 else:
                     job.decline_notes = analysis.location_notes
+
+        # Generate typed notes from AI analysis
+        if ai_result:
+            # Try to get RAG context for enhanced coaching
+            coaching_insights = None
+            requirement_matches = None
+
+            if use_rag and sparkles_client.is_configured:
+                try:
+                    # Extract requirements from job for RAG matching
+                    from src.services.jd_analyzer import detect_and_parse_jd
+                    jd_result = detect_and_parse_jd(job.description_raw)
+                    requirements = (
+                        jd_result.requirements.must_have[:10] +
+                        jd_result.requirements.nice_to_have[:5]
+                    )
+
+                    if requirements:
+                        # Get JD requirement matches from RAG
+                        requirement_matches = await sparkles_client.match_jd_requirements(
+                            requirements=requirements,
+                            threshold=0.40,
+                            limit_per_req=3,
+                        )
+
+                        # Convert to RAGEvidence for coaching
+                        from src.schemas.ai_analysis_coach import CoachingInsights, RAGEvidence
+                        evidence_list = []
+                        for match in requirement_matches:
+                            for top_match in match.top_matches[:1]:  # Top match only
+                                evidence_list.append(top_match)
+
+                        coaching_insights = CoachingInsights(
+                            talking_points=[],
+                            strengths_to_highlight=[],
+                            gaps_to_address=[],
+                            study_recommendations=[],
+                            watch_outs=[],
+                            evidence_from_resume=evidence_list,
+                        )
+                except Exception as e:
+                    import structlog
+                    logger = structlog.get_logger(__name__)
+                    logger.warning(
+                        "rag_context_failed",
+                        job_id=str(job.id),
+                        error=str(e),
+                    )
+
+            # Generate multiple typed notes
+            typed_notes = generate_typed_notes(
+                ai_result=ai_result,
+                coaching=coaching_insights,
+                requirement_matches=requirement_matches,
+            )
+
+            # Convert notes to dict format and append to job
+            existing_notes = job.notes or []
+            new_notes_dicts = [note.model_dump(mode="json") for note in typed_notes]
+            job.notes = existing_notes + new_notes_dicts
 
         await db.flush()
 
@@ -831,7 +948,7 @@ async def delete_job(
     response_model=JobNoteEntry,
     status_code=status.HTTP_201_CREATED,
     summary="Add note to job",
-    description="Add a new note to a job.",
+    description="Add a new note to a job with optional type and metadata.",
     dependencies=[Depends(require_permissions(["jobs:write"]))],
 )
 async def add_job_note(
@@ -850,11 +967,13 @@ async def add_job_note(
             detail=f"Job with id {job_id} not found",
         )
 
-    # Create new note entry
+    # Create new note entry with type and metadata
     new_note = JobNoteEntry(
         text=note_in.text,
         timestamp=datetime.utcnow(),
         source=note_in.source,
+        note_type=note_in.note_type,
+        metadata=note_in.metadata,
     )
 
     # Append to existing notes array (or create new array)
@@ -870,14 +989,16 @@ async def add_job_note(
     "/{job_id}/notes",
     response_model=list[JobNoteEntry],
     summary="List notes for job",
-    description="List all notes for a job.",
+    description="List all notes for a job with optional type filter.",
     dependencies=[Depends(require_permissions(["jobs:read"]))],
 )
 async def list_job_notes(
     db: DbSession,
     job_id: UUID,
+    note_type: Annotated[NoteType | None, Query(description="Filter by note type")] = None,
+    source: Annotated[NoteSource | None, Query(description="Filter by source (user/agent)")] = None,
 ) -> list[JobNoteEntry]:
-    """List all notes for a job."""
+    """List all notes for a job with optional filters."""
     query = select(Job).where(Job.id == job_id, Job.deleted_at.is_(None))
     result = await db.execute(query)
     job = result.scalar_one_or_none()
@@ -891,7 +1012,15 @@ async def list_job_notes(
     if not job.notes:
         return []
 
-    return [JobNoteEntry(**note) for note in job.notes]
+    notes = [JobNoteEntry(**note) for note in job.notes]
+
+    # Apply filters
+    if note_type:
+        notes = [n for n in notes if n.note_type == note_type]
+    if source:
+        notes = [n for n in notes if n.source == source]
+
+    return notes
 
 
 # Cover letter generation endpoint

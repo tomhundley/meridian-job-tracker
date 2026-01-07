@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 from src.schemas.job_contact import JobContactResponse
+from src.schemas.job_note import JobNoteEntry
 
 
 class JobStatus(str, Enum):
@@ -81,12 +82,13 @@ class JobBase(BaseModel):
     posted_at: datetime | None = Field(None, description="When the job was posted on the job board")
     target_role: RoleType | None = None
     priority: int = Field(50, ge=0, le=100)
-    notes: str | None = None
+    notes: list[JobNoteEntry] | None = Field(None, description="Structured notes array")
     tags: list[str] | None = None
     is_easy_apply: bool = Field(False, description="LinkedIn Easy Apply job")
     is_favorite: bool = Field(False, description="User marked as favorite")
     is_perfect_fit: bool = Field(False, description="User marked as perfect fit")
     is_ai_forward: bool = Field(False, description="AI-forward company/role")
+    is_location_compatible: bool = Field(True, description="Location compatible with user")
 
 
 class JobCreate(JobBase):
@@ -120,12 +122,13 @@ class JobUpdate(BaseModel):
     posted_at: datetime | None = None
     target_role: RoleType | None = None
     priority: int | None = Field(None, ge=0, le=100)
-    notes: str | None = None
+    notes: list[JobNoteEntry] | None = Field(None, description="Structured notes array")
     tags: list[str] | None = None
     is_easy_apply: bool | None = None
     is_favorite: bool | None = None
     is_perfect_fit: bool | None = None
     is_ai_forward: bool | None = None
+    is_location_compatible: bool | None = None
     closed_reason: str | None = Field(None, max_length=100)
     user_decline_reasons: list[str] | None = None
     company_decline_reasons: list[str] | None = None
@@ -231,3 +234,5 @@ class JobAnalysisResponse(BaseModel):
     seniority_level: str | None = Field(None, description="Detected seniority level")
     analysis_notes: list[str] = Field(default_factory=list, description="Analysis notes and observations")
     role_scores: list[RoleScoreResponse] | None = Field(None, description="Fit scores for each target role")
+    is_location_compatible: bool = Field(True, description="Whether job location is compatible with user")
+    location_notes: str | None = Field(None, description="Explanation of location compatibility")
