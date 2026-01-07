@@ -4,13 +4,14 @@ import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail, X, Heart } from "lucide-react";
+import { ArrowLeft, ExternalLink, Trash2, FileText, Clock, User, Linkedin, Mail, X, Heart, DollarSign, MapPin, Briefcase } from "lucide-react";
 import { StatusBadge } from "@/components/jobs/StatusBadge";
 import { DeclineReasonsPicker } from "@/components/jobs/DeclineReasonsPicker";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { StatusPipeline } from "@/components/jobs/StatusPipeline";
 import { JobFlagsToggle } from "@/components/jobs/JobFlagsToggle";
 import { RolePriorityScores } from "@/components/jobs/RolePriorityScores";
+import { JobNotes } from "@/components/jobs/JobNotes";
 import { toast } from "sonner";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -36,26 +37,38 @@ const roleTypes = [
   { value: "developer", label: "Developer" },
 ];
 
+interface NoteEntry {
+  text: string;
+  timestamp: string;
+  source: "user" | "agent";
+}
+
 interface Job {
   id: string;
   title: string;
   company: string;
   location: string | null;
+  work_location_type: "remote" | "hybrid" | "on_site" | null;
+  employment_type: "full_time" | "part_time" | "contract" | "contract_to_hire" | "temporary" | "internship" | null;
   url: string | null;
   description_raw: string | null;
   status: string;
   target_role: string | null;
   priority: number;
-  notes: string | null;
+  notes: NoteEntry[] | null;
   tags: string[];
   posted_at: string | null;
   applied_at: string | null;
   created_at: string;
   updated_at: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
   is_easy_apply: boolean;
   is_favorite: boolean;
   is_perfect_fit: boolean;
   is_ai_forward: boolean;
+  is_location_compatible: boolean;
   user_decline_reasons: string[] | null;
   company_decline_reasons: string[] | null;
   decline_notes: string | null;
@@ -68,6 +81,37 @@ function formatPostedAge(postedAt: string | null): string {
   if (days === 1) return "1 day ago";
   return `${days} days ago`;
 }
+
+function formatSalary(min: number | null, max: number | null, currency: string | null): string {
+  if (!min && !max) return "Not specified";
+  const currencySymbol = currency === "USD" ? "$" : currency || "$";
+  const formatNum = (n: number) => {
+    if (n >= 1000) return `${currencySymbol}${Math.round(n / 1000)}k`;
+    return `${currencySymbol}${n.toLocaleString()}`;
+  };
+  if (min && max) {
+    if (min === max) return formatNum(min);
+    return `${formatNum(min)} - ${formatNum(max)}`;
+  }
+  if (min) return `${formatNum(min)}+`;
+  if (max) return `Up to ${formatNum(max)}`;
+  return "Not specified";
+}
+
+const workLocationTypeLabels: Record<string, string> = {
+  remote: "Remote",
+  hybrid: "Hybrid",
+  on_site: "On-site",
+};
+
+const employmentTypeLabels: Record<string, string> = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  contract: "Contract",
+  contract_to_hire: "Contract to Hire",
+  temporary: "Temporary",
+  internship: "Internship",
+};
 
 interface CoverLetter {
   id: string;
@@ -107,8 +151,6 @@ export default function JobDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [editingNotes, setEditingNotes] = useState(false);
-  const [notes, setNotes] = useState("");
   const [coverLetters, setCoverLetters] = useState<CoverLetter[]>([]);
   const [deleteJobModalOpen, setDeleteJobModalOpen] = useState(false);
   const [deleteContactModalOpen, setDeleteContactModalOpen] = useState(false);
@@ -219,11 +261,6 @@ export default function JobDetailPage() {
     }
   };
 
-  const saveNotes = async () => {
-    await handleUpdateJob({ notes });
-    setEditingNotes(false);
-  };
-
   const handleDeleteContact = async () => {
     if (!contactToDelete) return;
 
@@ -288,6 +325,11 @@ export default function JobDetailPage() {
                   Easy Apply
                 </span>
               )}
+              {!job.is_location_compatible && (
+                <span className="px-2 py-1 text-xs font-medium rounded bg-orange-500/20 text-orange-400">
+                  Location Restricted
+                </span>
+              )}
             </div>
             <p className="text-[var(--color-text-secondary)]">{job.company}</p>
             <p className="text-xs text-[var(--color-text-tertiary)] font-mono mt-1">
@@ -315,6 +357,82 @@ export default function JobDetailPage() {
           >
             <Trash2 size={20} />
           </button>
+        </div>
+      </div>
+
+      {/* Key Details - Prominent Info Box */}
+      <div className="bg-gradient-to-r from-[var(--color-bg-secondary)] to-[var(--color-bg-elevated)] rounded-xl border-2 border-[var(--color-accent)]/30 p-6 shadow-lg">
+        <div className="grid grid-cols-3 gap-8">
+          {/* Job Title */}
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-[var(--color-accent)]/20 rounded-lg">
+              <Briefcase size={24} className="text-[var(--color-accent)]" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--color-text-tertiary)] font-semibold mb-1">
+                Position
+              </p>
+              <p className="text-xl font-bold text-[var(--color-text-primary)]">
+                {job.title}
+              </p>
+              {job.employment_type && (
+                <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                  {employmentTypeLabels[job.employment_type] || job.employment_type}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Compensation */}
+          <div className="flex items-start gap-4">
+            <div className={`p-3 rounded-lg ${job.salary_min || job.salary_max ? "bg-green-500/20" : "bg-[var(--color-bg-elevated)]"}`}>
+              <DollarSign size={24} className={job.salary_min || job.salary_max ? "text-green-400" : "text-[var(--color-text-tertiary)]"} />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--color-text-tertiary)] font-semibold mb-1">
+                Compensation
+              </p>
+              <p className={`text-xl font-bold ${job.salary_min || job.salary_max ? "text-green-400" : "text-[var(--color-text-tertiary)]"}`}>
+                {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
+              </p>
+              {(job.salary_min || job.salary_max) && (
+                <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                  per year
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="flex items-start gap-4">
+            <div className={`p-3 rounded-lg ${!job.is_location_compatible ? "bg-orange-500/20" : "bg-blue-500/20"}`}>
+              <MapPin size={24} className={!job.is_location_compatible ? "text-orange-400" : "text-blue-400"} />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.15em] text-[var(--color-text-tertiary)] font-semibold mb-1">
+                Location
+              </p>
+              <p className={`text-xl font-bold ${!job.is_location_compatible ? "text-orange-400" : "text-[var(--color-text-primary)]"}`}>
+                {job.location || "Not specified"}
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                {job.work_location_type && (
+                  <span className={`text-sm px-2 py-0.5 rounded ${
+                    job.work_location_type === "remote"
+                      ? "bg-green-500/20 text-green-400"
+                      : job.work_location_type === "hybrid"
+                      ? "bg-yellow-500/20 text-yellow-400"
+                      : "bg-blue-500/20 text-blue-400"
+                  }`}>
+                    {workLocationTypeLabels[job.work_location_type]}
+                  </span>
+                )}
+                {!job.is_location_compatible && (
+                  <span className="text-xs text-orange-400">Restricted</span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -360,65 +478,53 @@ export default function JobDetailPage() {
             />
           </div>
 
-          {/* Details Card */}
-          <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
-            <h2 className="text-lg font-semibold mb-4">Details</h2>
+          {/* Decline Details Card - shown when rejected or withdrawn */}
+          {(job.status === "rejected" || job.status === "withdrawn") && (
+            <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
+              <h2 className="text-lg font-semibold mb-4">Decline Details</h2>
 
-            <div>
-              <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
-                Location
-              </label>
-              <p className="px-3 py-2">{job.location || "-"}</p>
-            </div>
-
-            {/* Decline Reasons Section - shown when rejected or withdrawn */}
-            {(job.status === "rejected" || job.status === "withdrawn") && (
-              <div className="mt-6 pt-6 border-t border-[var(--color-border-subtle)]">
-                <h3 className="text-base font-semibold mb-4">Decline Details</h3>
-
-                <div className="grid grid-cols-2 gap-6">
-                  {/* User Decline Reasons */}
-                  <div>
-                    <DeclineReasonsPicker
-                      type="user"
-                      selectedReasons={job.user_decline_reasons || []}
-                      onChange={(reasons) =>
-                        handleUpdateJob({ user_decline_reasons: reasons.length > 0 ? reasons : null })
-                      }
-                      disabled={isUpdating}
-                    />
-                  </div>
-
-                  {/* Company Decline Reasons */}
-                  <div>
-                    <DeclineReasonsPicker
-                      type="company"
-                      selectedReasons={job.company_decline_reasons || []}
-                      onChange={(reasons) =>
-                        handleUpdateJob({ company_decline_reasons: reasons.length > 0 ? reasons : null })
-                      }
-                      disabled={isUpdating}
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-6">
+                {/* User Decline Reasons */}
+                <div>
+                  <DeclineReasonsPicker
+                    type="user"
+                    selectedReasons={job.user_decline_reasons || []}
+                    onChange={(reasons) =>
+                      handleUpdateJob({ user_decline_reasons: reasons.length > 0 ? reasons : null })
+                    }
+                    disabled={isUpdating}
+                  />
                 </div>
 
-                {/* Decline Notes */}
-                <div className="mt-4">
-                  <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
-                    Additional Notes
-                  </label>
-                  <textarea
-                    value={job.decline_notes || ""}
-                    onChange={(e) => handleUpdateJob({ decline_notes: e.target.value || null })}
+                {/* Company Decline Reasons */}
+                <div>
+                  <DeclineReasonsPicker
+                    type="company"
+                    selectedReasons={job.company_decline_reasons || []}
+                    onChange={(reasons) =>
+                      handleUpdateJob({ company_decline_reasons: reasons.length > 0 ? reasons : null })
+                    }
                     disabled={isUpdating}
-                    rows={3}
-                    placeholder="Any additional context about why this didn't work out..."
-                    className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] text-sm"
                   />
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Decline Notes */}
+              <div className="mt-4">
+                <label className="block text-sm text-[var(--color-text-tertiary)] mb-1">
+                  Additional Notes
+                </label>
+                <textarea
+                  value={job.decline_notes || ""}
+                  onChange={(e) => handleUpdateJob({ decline_notes: e.target.value || null })}
+                  disabled={isUpdating}
+                  rows={3}
+                  placeholder="Any additional context about why this didn't work out..."
+                  className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] text-sm"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Job Description */}
           {job.description_raw && (
@@ -432,51 +538,8 @@ export default function JobDetailPage() {
 
           {/* Notes */}
           <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Notes</h2>
-              {!editingNotes && (
-                <button
-                  onClick={() => {
-                    setNotes(job.notes || "");
-                    setEditingNotes(true);
-                  }}
-                  className="text-sm text-[var(--color-accent)] hover:underline"
-                >
-                  Edit
-                </button>
-              )}
-            </div>
-
-            {editingNotes ? (
-              <div className="space-y-3">
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={6}
-                  className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                  placeholder="Add notes about this job..."
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={saveNotes}
-                    disabled={isUpdating}
-                    className="px-4 py-2 bg-[var(--color-accent)] text-white rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditingNotes(false)}
-                    className="px-4 py-2 bg-[var(--color-bg-elevated)] rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-[var(--color-text-secondary)] whitespace-pre-wrap">
-                {job.notes || "No notes yet."}
-              </p>
-            )}
+            <h2 className="text-lg font-semibold mb-4">Notes</h2>
+            <JobNotes jobId={id} notes={job.notes} />
           </div>
         </div>
 
