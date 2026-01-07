@@ -1,14 +1,19 @@
 "use client";
 
 import { Search, MapPin, TrendingUp, DollarSign, Filter, CircleDot, Zap, Star, Target, Sparkles, Calendar, RefreshCw } from "lucide-react";
+import { DEFAULT_STATUSES } from "@/lib/usePersistentFilters";
 
-const statuses = [
-  { value: "", label: "Any" },
+const allStatuses = [
   { value: "saved", label: "Saved" },
+  { value: "researching", label: "Researching" },
+  { value: "ready_to_apply", label: "Ready" },
+  { value: "applying", label: "Applying" },
   { value: "applied", label: "Applied" },
   { value: "interviewing", label: "Interview" },
   { value: "offer", label: "Offer" },
   { value: "rejected", label: "Rejected" },
+  { value: "withdrawn", label: "Withdrawn" },
+  { value: "archived", label: "Archived" },
 ];
 
 const locationTypes = [
@@ -136,6 +141,70 @@ function SegmentedControl({ icon, label, options, value, onChange, accentColor }
   );
 }
 
+interface StatusCheckboxesProps {
+  selectedStatuses: string[];
+  onChange: (statuses: string[]) => void;
+}
+
+function StatusCheckboxes({ selectedStatuses, onChange }: StatusCheckboxesProps) {
+  const toggleStatus = (status: string) => {
+    if (selectedStatuses.includes(status)) {
+      onChange(selectedStatuses.filter((s) => s !== status));
+    } else {
+      onChange([...selectedStatuses, status]);
+    }
+  };
+
+  const selectAll = () => {
+    onChange(allStatuses.map((s) => s.value));
+  };
+
+  const selectNone = () => {
+    onChange([]);
+  };
+
+  return (
+    <div
+      className="flex items-center gap-2.5 px-3 py-2 rounded-lg backdrop-blur-sm border border-white/10"
+      style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}
+    >
+      <span className="text-blue-400">
+        <CircleDot size={14} />
+      </span>
+      <span className="text-xs font-medium uppercase tracking-wide text-blue-400">
+        Status
+      </span>
+      <div className="flex items-center gap-1 flex-wrap">
+        <button
+          onClick={selectAll}
+          className="px-2 py-0.5 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+        >
+          All
+        </button>
+        <button
+          onClick={selectNone}
+          className="px-2 py-0.5 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors border-r border-[var(--color-border-subtle)] mr-1"
+        >
+          None
+        </button>
+        {allStatuses.map((status) => (
+          <button
+            key={status.value}
+            onClick={() => toggleStatus(status.value)}
+            className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
+              selectedStatuses.includes(status.value)
+                ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] border border-transparent"
+            }`}
+          >
+            {status.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function JobFilters({
   search,
   status,
@@ -159,11 +228,12 @@ export function JobFilters({
   onMaxAgeDaysChange,
   onRefresh,
 }: JobFiltersProps) {
-  // Check if any filters are active
-  const hasActiveFilters = status || workLocationType || isEasyApply || isFavorite || isPerfectFit || isAiForward || minPriority > 0 || minSalary > 0 || maxAgeDays > 0;
+  // Check if any filters are active (excluding default status)
+  const isStatusNonDefault = status !== DEFAULT_STATUSES && status !== "";
+  const hasActiveFilters = isStatusNonDefault || workLocationType || isEasyApply || isFavorite || isPerfectFit || isAiForward || minPriority > 0 || minSalary > 0 || maxAgeDays > 0;
 
   const clearAllFilters = () => {
-    onStatusChange("");
+    onStatusChange(DEFAULT_STATUSES);
     onWorkLocationTypeChange("");
     onIsEasyApplyChange("");
     onIsFavoriteChange("");
@@ -215,13 +285,9 @@ export function JobFilters({
 
       {/* Filter Controls Row */}
       <div className="flex items-center gap-3 flex-wrap pt-3 border-t border-[var(--color-border-subtle)]">
-        <SegmentedControl
-          icon={<CircleDot size={14} />}
-          label="Status"
-          options={statuses.map((s) => ({ label: s.label, value: s.value }))}
-          value={status}
-          onChange={(v) => onStatusChange(v as string)}
-          accentColor="text-blue-400"
+        <StatusCheckboxes
+          selectedStatuses={status ? status.split(",").filter(Boolean) : []}
+          onChange={(statuses) => onStatusChange(statuses.join(","))}
         />
 
         <SegmentedControl

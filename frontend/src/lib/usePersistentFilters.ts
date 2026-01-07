@@ -20,9 +20,12 @@ interface FilterState {
   sortOrder: string;
 }
 
+// Default statuses: everything except "applied" and "rejected"
+export const DEFAULT_STATUSES = "saved,researching,ready_to_apply,applying,interviewing,offer,withdrawn,archived";
+
 const defaultFilters: FilterState = {
   search: "",
-  status: "",
+  status: DEFAULT_STATUSES,
   workLocationType: "",
   isEasyApply: "",
   isFavorite: "",

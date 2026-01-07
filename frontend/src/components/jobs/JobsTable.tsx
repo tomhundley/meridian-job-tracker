@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import useSWR from "swr";
+import { useEffect, useState, useCallback, useRef } from "react";
+import useSWRInfinite from "swr/infinite";
 import Link from "next/link";
-import { ChevronUp, ChevronDown, ChevronsUpDown, User, Zap, Target, Sparkles, Heart } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, User, Zap, Target, Sparkles, Heart, Loader2 } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const PAGE_SIZE = 50;
 
 interface Job {
   id: string;
@@ -119,23 +120,51 @@ export function JobsTable({
   sortOrder = "desc",
   onSortChange,
 }: JobsTableProps) {
-  // Build query string
-  const params = new URLSearchParams();
-  if (search) params.append("search", search);
-  if (status) params.append("status", status);
-  if (workLocationType) params.append("work_location_type", workLocationType);
-  if (isEasyApply !== undefined) params.append("is_easy_apply", isEasyApply.toString());
-  if (isFavorite !== undefined) params.append("is_favorite", isFavorite.toString());
-  if (isPerfectFit !== undefined) params.append("is_perfect_fit", isPerfectFit.toString());
-  if (isAiForward !== undefined) params.append("is_ai_forward", isAiForward.toString());
-  if (minPriority) params.append("min_priority", minPriority.toString());
-  if (minSalary) params.append("min_salary", minSalary.toString());
-  if (maxSalary) params.append("max_salary", maxSalary.toString());
-  if (maxAgeDays) params.append("max_age_days", maxAgeDays.toString());
-  params.append("sort_by", sortBy);
-  params.append("sort_order", sortOrder);
-  const queryString = params.toString();
-  const url = `/api/jobs${queryString ? `?${queryString}` : ""}`;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Build base query string (without pagination)
+  const buildQueryString = useCallback((page: number) => {
+    const params = new URLSearchParams();
+    if (search) params.append("search", search);
+    if (status) params.append("status", status);
+    if (workLocationType) params.append("work_location_type", workLocationType);
+    if (isEasyApply !== undefined) params.append("is_easy_apply", isEasyApply.toString());
+    if (isFavorite !== undefined) params.append("is_favorite", isFavorite.toString());
+    if (isPerfectFit !== undefined) params.append("is_perfect_fit", isPerfectFit.toString());
+    if (isAiForward !== undefined) params.append("is_ai_forward", isAiForward.toString());
+    if (minPriority) params.append("min_priority", minPriority.toString());
+    if (minSalary) params.append("min_salary", minSalary.toString());
+    if (maxSalary) params.append("max_salary", maxSalary.toString());
+    if (maxAgeDays) params.append("max_age_days", maxAgeDays.toString());
+    params.append("sort_by", sortBy);
+    params.append("sort_order", sortOrder);
+    params.append("page", page.toString());
+    params.append("page_size", PAGE_SIZE.toString());
+    return params.toString();
+  }, [search, status, workLocationType, isEasyApply, isFavorite, isPerfectFit, isAiForward, minPriority, minSalary, maxSalary, maxAgeDays, sortBy, sortOrder]);
+
+  // SWR Infinite for pagination
+  const getKey = useCallback((pageIndex: number, previousPageData: { items: Job[]; total: number; total_pages: number } | null) => {
+    // First page
+    if (pageIndex === 0) return `/api/jobs?${buildQueryString(1)}`;
+    // Reached the end
+    if (previousPageData && previousPageData.items.length === 0) return null;
+    if (previousPageData && pageIndex >= previousPageData.total_pages) return null;
+    // Next page
+    return `/api/jobs?${buildQueryString(pageIndex + 1)}`;
+  }, [buildQueryString]);
+
+  const { data, error, isLoading, isValidating, size, setSize, mutate } = useSWRInfinite(getKey, fetcher, {
+    revalidateFirstPage: false,
+    revalidateOnFocus: false,
+  });
+
+  // Flatten all pages into single array
+  const jobs: Job[] = data ? data.flatMap((page) => page.items || []) : [];
+  const total = data?.[0]?.total || 0;
+  const totalPages = data?.[0]?.total_pages || 1;
+  const isLoadingMore = isValidating && size > 1;
+  const hasMore = size < totalPages;
 
   const handleSort = (field: SortField) => {
     if (!onSortChange) return;
@@ -153,14 +182,30 @@ export function JobsTable({
       : <ChevronUp size={14} className="text-[var(--color-accent)]" />;
   };
 
-  const { data, error, isLoading, mutate } = useSWR(url, fetcher);
-
   // Trigger refresh when refreshKey changes
   useEffect(() => {
     if (refreshKey && refreshKey > 0) {
       mutate();
     }
   }, [refreshKey, mutate]);
+
+  // Infinite scroll: observe the load more element
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isValidating) {
+          setSize(size + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, isValidating, setSize, size]);
 
   if (isLoading) {
     return (
@@ -177,8 +222,6 @@ export function JobsTable({
       </div>
     );
   }
-
-  const jobs: Job[] = data?.items || [];
 
   if (jobs.length === 0) {
     return (
@@ -197,9 +240,24 @@ export function JobsTable({
   }
 
   return (
-    <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] overflow-hidden">
-      <table className="w-full">
-        <thead>
+    <div className="space-y-2">
+      {/* Total count header */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          Showing <span className="font-semibold text-[var(--color-text-primary)]">{jobs.length}</span> of{" "}
+          <span className="font-semibold text-[var(--color-text-primary)]">{total}</span> jobs
+        </p>
+        {isLoadingMore && (
+          <div className="flex items-center gap-2 text-sm text-[var(--color-text-tertiary)]">
+            <Loader2 size={14} className="animate-spin" />
+            Loading more...
+          </div>
+        )}
+      </div>
+
+      <div className="bg-[var(--color-bg-secondary)] rounded-xl border border-[var(--color-border-subtle)] overflow-hidden">
+        <table className="w-full">
+          <thead>
           <tr className="border-b border-[var(--color-border-subtle)]">
             <th
               className="text-left px-4 py-3 text-sm font-medium text-[var(--color-text-tertiary)] cursor-pointer hover:text-[var(--color-text-secondary)] transition-colors select-none"
@@ -372,6 +430,25 @@ export function JobsTable({
           ))}
         </tbody>
       </table>
+
+      {/* Infinite scroll trigger */}
+      <div
+        ref={loadMoreRef}
+        className="h-16 flex items-center justify-center"
+      >
+        {isLoadingMore && (
+          <div className="flex items-center gap-2 text-[var(--color-text-tertiary)]">
+            <Loader2 size={18} className="animate-spin" />
+            <span className="text-sm">Loading more jobs...</span>
+          </div>
+        )}
+        {!hasMore && jobs.length > 0 && (
+          <p className="text-sm text-[var(--color-text-tertiary)]">
+            All {total} jobs loaded
+          </p>
+        )}
+      </div>
+      </div>
     </div>
   );
 }
